@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+heroes.json
+*.csv
+ids.txt
+Ids.txt
