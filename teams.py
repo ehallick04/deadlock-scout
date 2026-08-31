@@ -24,7 +24,7 @@ TEAMS = {
         "region": "NA",
         "players": {
             "JonJon": 244109796,
-            "Goober": 128560078,
+            "Goober": 1285605078,
             "Birdee": 1871217631,
             "Braeden": 225764206,
             "Saiah": 25821887,
