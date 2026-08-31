@@ -21,21 +21,9 @@ from deadlock import (
     parse_ids,
 )
 from roster_import import BOOKMARKLET, parse_any
-from teams import TEAMS, choices, roster
+from teams import TEAMS, REGIONS, roster_many, team_names
 
 st.set_page_config(page_title="Deadlock Scout", page_icon="🔒", layout="wide")
-
-MATCH_MODES = [
-    "private_lobby",
-    "ranked,unranked,private_lobby",
-    "ranked,unranked",
-    "ranked",
-    "unranked",
-    "coop_bot",
-]
-
-CUSTOM_ENTRY = "Custom — paste IDs"
-
 
 @st.cache_data(ttl=900, show_spinner=False)
 def load(ids_tuple, days, top, match_mode, game_mode, labels_tuple):
@@ -74,22 +62,51 @@ def whole_number(text, fallback, label, minimum=1, maximum=3650):
 
 st.sidebar.header("Who")
 
-preset = st.sidebar.selectbox(
-    "Roster",
-    [CUSTOM_ENTRY, *choices()],
-    help="Pros presets pull custom-lobby games, where teams scrim.",
-)
+# A checklist rather than a dropdown. Rules:
+#   - Custom (pasted ids) can be combined with anything.
+#   - Ticking individual teams hides the All / NA / EU shortcuts, since
+#     those would only overlap with what you already picked.
+ALL_TEAMS = team_names()
 
-labels = {}
-if preset == CUSTOM_ENTRY:
+use_custom = st.sidebar.checkbox("Custom — paste IDs below", value=False)
+
+st.sidebar.markdown("**Teams**")
+picked_teams = [name for name in ALL_TEAMS
+                if st.sidebar.checkbox(
+                    f"{name}  ·  {TEAMS[name]['region']}",
+                    key=f"team_{name}")]
+
+shortcuts = []
+if not picked_teams:
+    st.sidebar.markdown("**Or a group**")
+    cols = st.sidebar.columns(3)
+    if cols[0].checkbox("All", key="grp_all"):
+        shortcuts.append("All")
+    if cols[1].checkbox("NA", key="grp_na"):
+        shortcuts.append("NA")
+    if cols[2].checkbox("EU", key="grp_eu"):
+        shortcuts.append("EU")
+else:
+    st.sidebar.caption("Group shortcuts hidden while individual teams are ticked.")
+
+selections = picked_teams or shortcuts
+ids, labels = ([], {})
+if selections:
+    ids, labels = roster_many(selections)
+
+preset = ", ".join(selections) if selections else ""
+
+# ---- pasted / typed players, merged on top
+raw = ""
+if use_custom:
     raw = st.sidebar.text_area(
         "Account IDs, friend codes, or statlocker URLs",
-        height=150,
+        height=110,
         placeholder="880934744\nhttps://statlocker.gg/profile/1170456491/matches",
         help="One per line. Steam friend codes work directly.",
     )
-    st.sidebar.markdown("**Import a team page**")
 
+    st.sidebar.markdown("**Import a team page**")
     pasted = st.sidebar.text_area(
         "Paste a team page here",
         height=90,
@@ -108,7 +125,6 @@ if preset == CUSTOM_ENTRY:
         st.code(BOOKMARKLET, language="javascript")
 
     page_text = pasted or ""
-
     if uploaded is not None:
         text = uploaded.getvalue().decode("utf-8", errors="replace")
         if uploaded.name.lower().endswith((".html", ".htm")) or "<a " in text.lower():
@@ -116,39 +132,37 @@ if preset == CUSTOM_ENTRY:
         else:
             raw = (raw or "") + "\n" + text
 
-    imported_names = {}
-    imported_team = ""
     if page_text.strip():
         result = parse_any(page_text)
-
         if result["kind"] == "directory":
             st.sidebar.info(f"That is the team directory ({len(result['teams'])} "
                             f"teams). Open a team and paste its page instead.")
             st.session_state.directory = result["teams"]
-
         elif result["players"]:
-            imported_team = result["team"]
-            st.sidebar.success(f"{imported_team or 'Roster'}: "
+            st.sidebar.success(f"{result['team'] or 'Roster'}: "
                                f"{len(result['players'])} players")
-            imported_names = {p["account_id"]: p for p in result["players"]}
-            raw = (raw or "") + "\n" + "\n".join(
-                str(p["account_id"]) for p in result["players"])
+            for p in result["players"]:
+                if p["account_id"] not in labels:
+                    ids.append(p["account_id"])
+                labels[p["account_id"]] = {
+                    "ign": p["ign"] or p.get("persona", ""),
+                    "team": result["team"] or "imported",
+                    "region": result.get("region", ""),
+                }
+            preset = ", ".join(filter(None, [preset, result["team"] or "imported"]))
         else:
             st.sidebar.warning("No players found in that page. If it needs "
-                               "JavaScript, copy it from devtools instead.")
+                               "JavaScript, use the bookmarklet.")
 
-    ids = parse_ids((raw or "").replace(",", " ").split())
-    if imported_names:
-        labels = {aid: {"ign": p["ign"] or p["persona"],
-                        "team": imported_team,
-                        "region": "",
-                        "role": p.get("role", "")}
-                  for aid, p in imported_names.items()}
-    default_mode = WITH_CUSTOMS
-else:
-    ids, labels = roster(preset)
-    st.sidebar.success(f"{preset}: {len(ids)} players")
-    default_mode = CUSTOMS_ONLY
+    for account_id in parse_ids((raw or "").replace(",", " ").split()):
+        if account_id not in labels:
+            ids.append(account_id)
+            labels[account_id] = {"ign": "", "team": "", "region": ""}
+
+if selections:
+    st.sidebar.success(f"{len(ids)} players selected")
+
+preset = preset or "Custom"
 
 st.sidebar.header("Filters")
 
@@ -160,13 +174,22 @@ top = whole_number(
     st.sidebar.text_input("Heroes per player", value="5"),
     5, "Heroes per player", minimum=1, maximum=50)
 
-match_mode = st.sidebar.selectbox(
-    "Match mode", MATCH_MODES, index=MATCH_MODES.index(default_mode))
+st.sidebar.markdown("**Match modes**  (tick any combination)")
+MODE_OPTIONS = [("ranked", True), ("unranked", True),
+                ("private_lobby", True), ("coop_bot", False)]
+chosen_modes = [name for name, on in MODE_OPTIONS
+                if st.sidebar.checkbox(name, value=on, key=f"mode_{name}")]
+
+if not chosen_modes:
+    st.sidebar.warning("Pick at least one match mode. Using ranked + unranked.")
+    chosen_modes = ["ranked", "unranked"]
+match_mode = ",".join(chosen_modes)
+
 game_mode = st.sidebar.selectbox("Game mode", ["normal", "street_brawl"], index=0)
 
 together = st.sidebar.checkbox(
     "Only games they played together",
-    value=(preset != CUSTOM_ENTRY),
+    value=bool(selections),
     help="Keeps only matches containing several of the selected players, "
          "so pugs and inhouses with strangers drop out. Custom lobbies only.",
 )
@@ -254,7 +277,7 @@ st.title("Deadlock Scouting Report")
 st.caption("Most-played heroes, win rates, and ranks — from the community Deadlock API.")
 
 if not ids:
-    st.info("Pick a roster, or paste player IDs in the sidebar to begin.")
+    st.info("Tick a team in the sidebar, or use Custom to paste player IDs.")
     st.stop()
 
 st.write(f"**{preset}** · {len(ids)} player(s) · last {days} days · "

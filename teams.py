@@ -9,7 +9,7 @@ Player ids are Steam friend codes / SteamID3 account ids.
 
 TEAMS = {
     # ---------------------------------------------------------- NA
-    "Poppers Pupils": {
+    "Poppers pupils": {
         "region": "NA",
         "players": {
             "Zeno": 1730032433,
@@ -20,7 +20,7 @@ TEAMS = {
             "Poppers": 1929248273,
         },
     },
-    "Melee Creeps": {
+    "Melee creeps": {
         "region": "NA",
         "players": {
             "JonJon": 244109796,
@@ -97,6 +97,22 @@ def roster(selection):
             ids.append(account_id)
             labels[account_id] = {"ign": ign, "team": team,
                                   "region": info["region"]}
+    return ids, labels
+
+
+def roster_many(selections):
+    """
+    Combine several selections into one roster.
+    selections: any mix of team names, regions, and "All".
+    -> (ids, {account_id: {"ign","team","region"}})
+    """
+    ids, labels = [], {}
+    for name in selections:
+        got_ids, got_labels = roster(name)
+        for account_id in got_ids:
+            if account_id not in labels:
+                ids.append(account_id)
+            labels[account_id] = got_labels[account_id]
     return ids, labels
 
 
