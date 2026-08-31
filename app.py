@@ -37,7 +37,10 @@ CUSTOM_ENTRY = "Custom — paste IDs"
 @st.cache_data(ttl=900, show_spinner=False)
 def load(ids_tuple, days, top, match_mode, game_mode, labels_tuple):
     """Cached so re-sorting a table doesn't re-hit the API."""
-    labels = {k: v for k, v in labels_tuple}
+    # labels_tuple is ((account_id, (("ign", ...), ("team", ...))), ...)
+    # dict(v) turns the inner pairs back into a dict -- without it,
+    # build_report gets tuples and .get() fails.
+    labels = {k: dict(v) for k, v in labels_tuple}
     return build_report(list(ids_tuple), days=days, top=top,
                         match_mode=match_mode, game_mode=game_mode,
                         labels=labels)
