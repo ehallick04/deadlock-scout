@@ -314,6 +314,7 @@ def menu():
 ============== DEADLOCK PLAYER REPORT ==============
   P. Pros  (preset team rosters, custom games)
   C. Cache (status / clear)
+  H. Import a roster from a saved team page (.html)
   1. Add players (ids or statlocker URLs)
   2. Load ids from a file
   3. Set time window        (now: last {days} days)
@@ -335,6 +336,39 @@ def menu():
 
         if choice.lower() == "p":
             pros_menu(days, top)
+
+        elif choice.lower() == "h":
+            from roster_import import as_teams_entry, parse_any, read_html
+            raw = ask("  path to the saved team page (.html): ")
+            found_path = find_file(raw) if raw else None
+            if found_path:
+                try:
+                    result = parse_any(read_html(found_path))
+                except OSError as e:
+                    result, _ = {"kind": "generic", "players": [], "teams": []}, print(f"  {e}")
+
+                if result["kind"] == "directory":
+                    print(f"  team directory — {len(result['teams'])} teams:")
+                    for t in result["teams"]:
+                        print(f"    {t['team_id']:<6} {t['team']}")
+                    print("  open one of these in your browser and save that page")
+                elif not result["players"]:
+                    print("  no players found — if the page needs JavaScript, copy "
+                          "it from devtools (right-click <html> -> Copy element)")
+                else:
+                    print(f"  {result['team'] or 'roster'}: "
+                          f"{len(result['players'])} players")
+                    for p_ in result["players"]:
+                        print(f"    {p_['role'] or '-':<6} {p_['ign']:<22} "
+                              f"{p_['account_id']:<12} {p_['persona']}")
+                    ids = list(dict.fromkeys(
+                        ids + [p_["account_id"] for p_ in result["players"]]))
+                    print(f"  added to the player list ({len(ids)} total)")
+                    if ask("  print a teams.py block? (y/N): ", "n").lower().startswith("y"):
+                        region = ask("  region (NA/EU): ", "NA").upper()
+                        print()
+                        print(as_teams_entry(result["team"] or "New Team",
+                                             region, result["players"]))
 
         elif choice.lower() == "c":
             info = cache_info()

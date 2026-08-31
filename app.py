@@ -20,6 +20,7 @@ from deadlock import (
     WITH_CUSTOMS, build_report, build_team_report, flatten, hero_totals,
     parse_ids,
 )
+from roster_import import parse_any
 from teams import TEAMS, choices, roster
 
 st.set_page_config(page_title="Deadlock Scout", page_icon="🔒", layout="wide")
@@ -87,10 +88,53 @@ if preset == CUSTOM_ENTRY:
         placeholder="880934744\nhttps://statlocker.gg/profile/1170456491/matches",
         help="One per line. Steam friend codes work directly.",
     )
-    uploaded = st.sidebar.file_uploader("...or upload a list", type=["txt", "csv"])
+    st.sidebar.markdown("**Import a team page**")
+    pasted = st.sidebar.text_area(
+        "Paste a team page here",
+        height=90,
+        placeholder="Open the team page, Ctrl+A then Ctrl+C, and paste it here",
+        help="Works with DSE player-portal team pages and the all-teams "
+             "directory. Nothing is fetched — this only reads what you paste.",
+    )
+    uploaded = st.sidebar.file_uploader(
+        "...or upload a list / saved page", type=["txt", "csv", "html", "htm"])
+
+    page_text = pasted or ""
     if uploaded is not None:
-        raw = (raw or "") + "\n" + uploaded.getvalue().decode("utf-8", errors="replace")
+        text = uploaded.getvalue().decode("utf-8", errors="replace")
+        if uploaded.name.lower().endswith((".html", ".htm")) or "<a " in text.lower():
+            page_text = text
+        else:
+            raw = (raw or "") + "\n" + text
+
+    imported_names = {}
+    imported_team = ""
+    if page_text.strip():
+        result = parse_any(page_text)
+
+        if result["kind"] == "directory":
+            st.sidebar.info(f"That is the team directory ({len(result['teams'])} "
+                            f"teams). Open a team and paste its page instead.")
+            st.session_state.directory = result["teams"]
+
+        elif result["players"]:
+            imported_team = result["team"]
+            st.sidebar.success(f"{imported_team or 'Roster'}: "
+                               f"{len(result['players'])} players")
+            imported_names = {p["account_id"]: p for p in result["players"]}
+            raw = (raw or "") + "\n" + "\n".join(
+                str(p["account_id"]) for p in result["players"])
+        else:
+            st.sidebar.warning("No players found in that page. If it needs "
+                               "JavaScript, copy it from devtools instead.")
+
     ids = parse_ids((raw or "").replace(",", " ").split())
+    if imported_names:
+        labels = {aid: {"ign": p["ign"] or p["persona"],
+                        "team": imported_team,
+                        "region": "",
+                        "role": p.get("role", "")}
+                  for aid, p in imported_names.items()}
     default_mode = WITH_CUSTOMS
 else:
     ids, labels = roster(preset)
@@ -186,6 +230,16 @@ with st.sidebar.expander("Cache"):
 
 
 # --------------------------------------------------------------- main
+
+if st.session_state.get("directory"):
+    with st.expander(f"Team directory — {len(st.session_state.directory)} teams"):
+        q = st.text_input("Search teams", key="dirsearch")
+        rows = [t for t in st.session_state.directory
+                if not q or q.lower() in t["team"].lower()]
+        st.caption("Open a team's page in your browser, then paste it in the "
+                   "sidebar to load that roster.")
+        st.dataframe(pd.DataFrame(rows)[["team", "team_id", "url"]],
+                     hide_index=True, use_container_width=True)
 
 st.title("Deadlock Scouting Report")
 st.caption("Most-played heroes, win rates, and ranks — from the community Deadlock API.")
