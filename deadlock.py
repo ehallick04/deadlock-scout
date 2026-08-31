@@ -248,16 +248,18 @@ def build_report(account_ids, days=DEFAULT_DAYS, top=5, use_history=False,
         played = sorted(by_player.get(account_id, []),
                         key=lambda s: -s.get("matches_played", 0))
 
-        hero_rows = []
-        for s in played[:top]:
+        def _r(s):
             n, w = s.get("matches_played", 0), s.get("wins", 0)
-            hero_rows.append({
+            return {
                 "hero": names.get(s["hero_id"], f"hero {s['hero_id']}"),
                 "hero_id": s["hero_id"],
                 "matches": n,
                 "wins": w,
                 "win_rate": round(w / n * 100, 1) if n else 0.0,
-            })
+            }
+
+        all_rows = [_r(s) for s in played]
+        hero_rows = all_rows[:top]
 
         profile = profiles.get(account_id, {})
         label = labels.get(account_id, {})
@@ -275,6 +277,7 @@ def build_report(account_ids, days=DEFAULT_DAYS, top=5, use_history=False,
             "badge": info["badge"],
             "total_matches": sum(s.get("matches_played", 0) for s in played),
             "heroes": hero_rows,
+            "all_heroes": all_rows,
         })
 
     return players
@@ -298,31 +301,67 @@ def flatten(players):
     ]
 
 
-def hero_totals(players):
+def hero_totals(players, normalize=True, min_games=1):
     """
-    Win rate per hero pooled across everyone in the report.
-    -> [{'hero', 'players', 'matches', 'wins', 'win_rate'}] sorted by matches.
+    Hero usage pooled across everyone in the report.
+
+    Raw totals let one high-volume player dominate: someone with 40 games
+    contributes five times what a player with 8 does. `pick_share` fixes
+    that by asking each player what FRACTION of their own games were on a
+    hero, then averaging those fractions - every player gets one equal
+    vote regardless of how much they played.
+
+    -> [{'hero', 'players', 'matches', 'wins', 'win_rate',
+         'pick_share', 'avg_win_rate'}]
+
+    win_rate      pooled, weighted by games (the raw view)
+    avg_win_rate  mean of each player's own win rate (the equal-weight view)
+    pick_share    mean share of a player's games spent on this hero, %
+    min_games     ignore a player's contribution to a hero below this many
+                  games, which keeps 1-game 0%/100% noise out of averages
     """
-    pool = {}
+    pool, shares, rates = {}, {}, {}
+    contributing = 0
+
     for p in players:
-        for h in p["heroes"]:
-            row = pool.setdefault(h["hero"], {"hero": h["hero"], "players": set(),
+        rows = p.get("all_heroes") or p.get("heroes") or []
+        total = sum(r["matches"] for r in rows)
+        if not total:
+            continue
+        contributing += 1
+
+        for r in rows:
+            row = pool.setdefault(r["hero"], {"hero": r["hero"],
+                                              "players": set(),
                                               "matches": 0, "wins": 0})
             row["players"].add(p.get("row_key", p["account_id"]))
-            row["matches"] += h["matches"]
-            row["wins"] += h["wins"]
+            row["matches"] += r["matches"]
+            row["wins"] += r["wins"]
+
+            shares.setdefault(r["hero"], []).append(r["matches"] / total)
+            if r["matches"] >= min_games:
+                rates.setdefault(r["hero"], []).append(r["win_rate"])
 
     out = []
-    for row in pool.values():
+    for hero, row in pool.items():
+        picks = shares.get(hero, [])
+        wr = rates.get(hero, [])
         out.append({
-            "hero": row["hero"],
+            "hero": hero,
             "players": len(row["players"]),
             "matches": row["matches"],
             "wins": row["wins"],
             "win_rate": round(row["wins"] / row["matches"] * 100, 1)
             if row["matches"] else 0.0,
+            # divide by EVERY contributing player, not just those who
+            # picked the hero, so shares across all heroes sum to 100%
+            "pick_share": round(sum(picks) / contributing * 100, 1)
+            if contributing else 0.0,
+            "avg_win_rate": round(sum(wr) / len(wr), 1) if wr else None,
         })
-    return sorted(out, key=lambda r: -r["matches"])
+
+    key = "pick_share" if normalize else "matches"
+    return sorted(out, key=lambda r: -r[key])
 
 
 # =====================================================================
@@ -414,16 +453,19 @@ def _team_block(members, team_label, region, days, top, min_players,
                 row["wins"] += 1 if outcome == WIN else 0
 
         played = sorted(tally.values(), key=lambda r: -r["matches_played"])
-        hero_rows = []
-        for r in played[:top]:
+
+        def _row(r):
             n, w = r["matches_played"], r["wins"]
-            hero_rows.append({
+            return {
                 "hero": names.get(r["hero_id"], f"hero {r['hero_id']}"),
                 "hero_id": r["hero_id"],
                 "matches": n,
                 "wins": w,
                 "win_rate": round(w / n * 100, 1) if n else 0.0,
-            })
+            }
+
+        all_rows = [_row(r) for r in played]     # every hero, for aggregates
+        hero_rows = all_rows[:top]               # trimmed, for display
 
         info = get_rank(account_id)
         meta = sub_meta.get(account_id, {})
@@ -454,6 +496,7 @@ def _team_block(members, team_label, region, days, top, min_players,
             "custom_matches": len(own_customs),
             "team_matches": len(own_shared),
             "heroes": hero_rows,
+            "all_heroes": all_rows,
         })
 
     return players, shared, counts, subs, len(participants)

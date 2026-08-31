@@ -11,6 +11,7 @@ data and formats it. No HTTP and no game logic lives here.
     python main.py --pros All                      # customs where 4+ teammates played together
     python main.py --pros Leviathan --together 5   # stricter: 5+ of the roster
     python main.py --pros Leviathan --subs         # also report stand-ins
+    python main.py --pros All --raw                # rank heroes by raw game count
     python main.py --pros Leviathan --solo         # all their customs, no grouping
     python main.py --pros NA --days 14
     python main.py --pros Leviathan --days 30
@@ -96,7 +97,7 @@ def run(ids, days=DEFAULT_DAYS, top=5, use_history=False, csv_path=None,
                            labels=labels)
     print_report(players, days, match_mode, game_mode)
     if show_totals:
-        print_hero_totals(players)
+        print_hero_totals(players, normalize="--raw" not in sys.argv)
     if csv_path:
         write_csv(players, csv_path)
     return players
@@ -145,25 +146,37 @@ def run_team(ids, days, top, min_players, labels, csv_path=None,
             print(f"    {h['hero']:<16}{h['matches']:>8}{h['wins']:>7}"
                   f"{h['win_rate']:>10.1f}%")
 
-    print_hero_totals(players)
+    print_hero_totals(players, normalize="--raw" not in sys.argv)
     if csv_path:
         write_csv(players, csv_path)
     return players
 
 
-def print_hero_totals(players):
-    """Win rate per hero, pooled across every player in the report."""
-    totals = hero_totals(players)
+def print_hero_totals(players, normalize=True, min_games=2):
+    """
+    Hero usage across everyone in the report.
+
+    pick share = average of each player's own usage rate, so a player with
+    far more games than the rest does not swing the aggregate.
+    """
+    totals = hero_totals(players, normalize=normalize, min_games=min_games)
     if not totals:
         return
-    print(f"\n{'=' * 58}")
-    print("  HERO TOTALS (everyone pooled)")
-    print(f"{'=' * 58}")
-    print(f"  {'hero':<16}{'players':>8}{'played':>8}{'wins':>7}{'win rate':>11}")
-    print(f"  {'-' * 50}")
+    print(f"\n{'=' * 70}")
+    print("  HERO TOTALS" + ("  (normalized — one vote per player)"
+                             if normalize else "  (raw totals)"))
+    print(f"{'=' * 70}")
+    print(f"  {'hero':<16}{'pick share':>12}{'avg WR':>9}"
+          f"{'players':>9}{'played':>8}{'pooled WR':>11}")
+    print(f"  {'-' * 66}")
     for t in totals:
-        print(f"  {t['hero']:<16}{t['players']:>8}{t['matches']:>8}"
-              f"{t['wins']:>7}{t['win_rate']:>10.1f}%")
+        avg = f"{t['avg_win_rate']:.1f}%" if t["avg_win_rate"] is not None else "-"
+        print(f"  {t['hero']:<16}{t['pick_share']:>11.1f}%{avg:>9}"
+              f"{t['players']:>9}{t['matches']:>8}{t['win_rate']:>10.1f}%")
+    print(f"\n  pick share = mean share of a player's games on that hero")
+    print(f"  avg WR     = mean of individual win rates "
+          f"(players with {min_games}+ games)")
+    print(f"  pooled WR  = total wins / total games, volume-weighted")
 
 
 # --------------------------------------------------------------- menu

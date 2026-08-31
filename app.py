@@ -253,18 +253,42 @@ tab_hero, tab_player, tab_team, tab_data = st.tabs(
 
 # ---- pooled hero win rates
 with tab_hero:
-    st.caption("Every hero in the group's top picks, pooled across players.")
-    totals = pd.DataFrame(hero_totals(players))
+    col_a, col_b = st.columns([2, 1])
+    normalize = col_a.toggle(
+        "Normalize by player", value=True,
+        help="Average each player's own usage rate instead of summing games, "
+             "so someone who plays far more than the rest does not dominate.")
+    min_games = whole_number(
+        col_b.text_input("Min games for avg WR", value="2"),
+        2, "Min games", minimum=1, maximum=50)
+
+    totals = pd.DataFrame(hero_totals(players, normalize=normalize,
+                                      min_games=min_games))
+    order = (["hero", "pick_share", "avg_win_rate", "players", "matches",
+              "wins", "win_rate"] if normalize else
+             ["hero", "players", "matches", "wins", "win_rate",
+              "pick_share", "avg_win_rate"])
     st.dataframe(
-        totals, hide_index=True, use_container_width=True,
+        totals[order], hide_index=True, use_container_width=True,
         column_config={
             "hero": "Hero",
+            "pick_share": st.column_config.ProgressColumn(
+                "Pick share", format="%.1f%%", min_value=0,
+                max_value=float(max(totals["pick_share"].max(), 1))),
+            "avg_win_rate": st.column_config.NumberColumn(
+                "Avg WR", format="%.1f%%",
+                help="Mean of individual win rates — equal weight per player"),
             "players": st.column_config.NumberColumn("Players"),
             "matches": st.column_config.NumberColumn("Played"),
             "wins": st.column_config.NumberColumn("Wins"),
-            "win_rate": WINRATE_COL,
+            "win_rate": st.column_config.NumberColumn(
+                "Pooled WR", format="%.1f%%",
+                help="Total wins / total games — weighted by volume"),
         },
     )
+    st.caption("**Pick share** averages each player's own usage rate, so every "
+               "player counts equally. **Played** is the raw game count for "
+               "comparison.")
 
 # ---- per player
 with tab_player:
