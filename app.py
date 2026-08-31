@@ -22,8 +22,8 @@ from deadlock import (
     WITH_CUSTOMS, build_report, build_team_report, composition_counts,
     flatten, hero_totals, match_compositions, parse_ids,
 )
-from roster_import import BOOKMARKLET, parse_any
-from teams import TEAMS, REGIONS, roster_many, team_names
+from roster_import import BOOKMARKLET, HARVESTER, find_teams, parse_any
+from teams import LEAGUE, PINNED, TEAMS, divisions, roster_many
 
 st.set_page_config(page_title="Deadlock Scout", page_icon="🔒", layout="wide")
 
@@ -68,22 +68,44 @@ st.sidebar.header("Who")
 #   - Custom (pasted ids) can be combined with anything.
 #   - Ticking individual teams hides the All / NA / EU shortcuts, since
 #     those would only overlap with what you already picked.
-ALL_TEAMS = team_names()
+ALL_TEAMS = sorted(PINNED, key=str.lower)
 
 use_custom = st.sidebar.checkbox("Custom — paste IDs below", value=False)
 
 st.sidebar.markdown("**Teams**")
 picked_teams = [name for name in ALL_TEAMS
                 if st.sidebar.checkbox(
-                    f"{name}  ·  {TEAMS[name]['region']}",
+                    f"{name}  ·  {TEAMS[name].get('region', '')}",
                     key=f"team_{name}")]
+
+# Everything from rosters.json. 180 checkboxes would be unusable, so these
+# get a searchable multiselect instead -- ticked ones join picked_teams and
+# behave identically from here on.
+league_picks = []
+if LEAGUE:
+    st.sidebar.markdown(f"**League teams**  ·  {len(LEAGUE)} from rosters.json")
+    div = st.sidebar.selectbox("Division", ["Any"] + divisions(), key="lg_div")
+    pool = sorted(LEAGUE, key=str.lower)
+    if div != "Any":
+        pool = [n for n in pool if TEAMS[n].get("division") == div]
+    league_picks = st.sidebar.multiselect(
+        "Pick teams (type to search)", pool, key="lg_teams",
+        help="Rosters come from the DSE player portal, built by build_rosters.py.")
+    if div != "Any" and st.sidebar.checkbox(f"Whole division ({len(pool)} teams)",
+                                            key="lg_whole"):
+        league_picks = pool
+else:
+    st.sidebar.caption("No rosters.json yet — run build_rosters.py to add "
+                       "every league team.")
+
+picked_teams = picked_teams + [n for n in league_picks if n not in picked_teams]
 
 shortcuts = []
 if not picked_teams:
     st.sidebar.markdown("**Or a group**")
     cols = st.sidebar.columns(3)
     if cols[0].checkbox("All", key="grp_all"):
-        shortcuts.append("All")
+        shortcuts.append("All (pinned)")
     if cols[1].checkbox("NA", key="grp_na"):
         shortcuts.append("NA")
     if cols[2].checkbox("EU", key="grp_eu"):
@@ -92,6 +114,10 @@ else:
     st.sidebar.caption("Group shortcuts hidden while individual teams are ticked.")
 
 selections = picked_teams or shortcuts
+
+if len(selections) > 8:
+    st.sidebar.warning(f"{len(selections)} teams selected — that is a lot of "
+                       "API calls on the first build. Cached after that.")
 ids, labels = ([], {})
 if selections:
     ids, labels = roster_many(selections)
@@ -125,6 +151,16 @@ if use_custom:
                    "click it, then paste above. Only needed if a plain "
                    "Ctrl+A/Ctrl+C comes out without links.")
         st.code(BOOKMARKLET, language="javascript")
+
+    with st.sidebar.expander("Bake in every league team"):
+        st.caption("One team at a time is slow. Make a bookmark with this as "
+                   "its URL, open the team directory, click it once, and it "
+                   "walks every team page in your own session and downloads "
+                   "dse_rosters.html. Then run, in the project folder:")
+        st.code("python build_rosters.py dse_rosters.html", language="bash")
+        st.caption("Commit the rosters.json it writes and every teammate — "
+                   "and this app — gets the rosters with no importing.")
+        st.code(HARVESTER, language="javascript")
 
     page_text = pasted or ""
     if uploaded is not None:
@@ -267,12 +303,20 @@ with st.sidebar.expander("Cache"):
 
 if st.session_state.get("directory"):
     with st.expander(f"Team directory — {len(st.session_state.directory)} teams"):
-        q = st.text_input("Search teams", key="dirsearch")
-        rows = [t for t in st.session_state.directory
-                if not q or q.lower() in t["team"].lower()]
-        st.caption("Open a team's page in your browser, then paste it in the "
+        directory = st.session_state.directory
+        divisions = sorted({t.get("division", "") for t in directory if t.get("division")})
+        c1, c2 = st.columns([2, 1])
+        q = c1.text_input("Search teams", key="dirsearch")
+        div = c2.selectbox("Division", ["All"] + divisions, key="dirdiv")
+        rows = find_teams(directory, q)
+        if div != "All":
+            rows = [t for t in rows if t.get("division") == div]
+        st.caption("This page has no account IDs — only team names and IDs. "
+                   "Open a team's page in your browser, then paste it in the "
                    "sidebar to load that roster.")
-        st.dataframe(pd.DataFrame(rows)[["team", "team_id", "url"]],
+        cols = [c for c in ("team", "division", "team_id", "url")
+                if rows and c in rows[0]]
+        st.dataframe(pd.DataFrame(rows)[cols],
                      hide_index=True, use_container_width=True)
 
 st.title("Deadlock Scouting Report")

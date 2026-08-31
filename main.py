@@ -47,7 +47,7 @@ from deadlock import (
     flatten, get_rank, hero_totals, match_compositions, parse_ids,
     read_id_file, rank_name,
 )
-from teams import TEAMS, choices, roster
+from teams import LEAGUE, PINNED, TEAMS, choices, roster, search
 
 
 # --------------------------------------------------------------- output
@@ -294,22 +294,40 @@ def pros_menu(days, top):
 
     print("\n  --- Pros: pick a roster ---")
     for i, name in enumerate(picks, 1):
-        if name == "All":
-            n = sum(len(t["players"]) for t in TEAMS.values())
-            print(f"    {i:>2}. All teams ({n} players)")
+        if name.startswith("All"):
+            n = sum(len(TEAMS[t]["players"]) for t in PINNED)
+            print(f"    {i:>2}. {name} ({n} players)")
         elif name in ("NA", "EU"):
             n = sum(len(t["players"]) for t in TEAMS.values()
-                    if t["region"] == name)
+                    if t.get("region") == name)
             print(f"    {i:>2}. {name} ({n} players)")
         else:
             t = TEAMS[name]
-            print(f"    {i:>2}. {name} [{t['region']}] ({len(t['players'])} players)")
+            tag = t.get("region") or t.get("division") or "-"
+            print(f"    {i:>2}. {name} [{tag}] ({len(t['players'])} players)")
 
-    pick = ask("  number (blank = cancel): ")
-    if not pick or not pick.isdigit() or not 1 <= int(pick) <= len(picks):
-        return
+    if LEAGUE:
+        print(f"     S. search the {len(LEAGUE)} league teams from rosters.json")
 
-    selection = picks[int(pick) - 1]
+    pick = ask("  number, or S to search (blank = cancel): ")
+
+    if pick.strip().lower() == "s" and LEAGUE:
+        hits = search(ask("  team name: "))
+        if not hits:
+            print("  no team matched")
+            return
+        for i, name in enumerate(hits, 1):
+            t = TEAMS[name]
+            tag = t.get("division") or t.get("region") or "-"
+            print(f"    {i:>2}. {name} [{tag}] ({len(t['players'])} players)")
+        pick = ask("  number (blank = cancel): ")
+        if not pick or not pick.isdigit() or not 1 <= int(pick) <= len(hits):
+            return
+        selection = hits[int(pick) - 1]
+    else:
+        if not pick or not pick.isdigit() or not 1 <= int(pick) <= len(picks):
+            return
+        selection = picks[int(pick) - 1]
     ids, labels = roster(selection)
 
     d = ask(f"  days to look back (blank = {days}): ", str(days))
@@ -365,6 +383,7 @@ def menu():
   P. Pros  (preset team rosters, custom games)
   C. Cache (status / clear)
   H. Import a roster from a saved team page (.html)
+  B. Bake in every league team (harvester bookmarklet)
   1. Add players (ids or statlocker URLs)
   2. Load ids from a file
   3. Set time window        (now: last {days} days)
@@ -387,6 +406,26 @@ def menu():
         if choice.lower() == "p":
             pros_menu(days, top)
 
+        elif choice.lower() == "b":
+            from roster_import import HARVESTER
+            print("""
+  Baking in every league team, once:
+
+    1. Make a browser bookmark. Put the line below in as its URL.
+    2. Open https://players.dse.gg/teams/ and click that bookmark.
+       It walks every team page in your own logged-in session and
+       downloads dse_rosters.html. Give it a minute.
+    3. In this project folder, run:
+
+           python build_rosters.py dse_rosters.html
+
+    4. Commit the rosters.json it writes. Every teammate and the
+       deployed app then has all the rosters with nothing to import.
+""")
+            print(HARVESTER)
+            print("\n  (a folder of saved team pages works too: "
+                  "python build_rosters.py pages/)")
+
         elif choice.lower() == "h":
             from roster_import import as_teams_entry, parse_any, read_html
             raw = ask("  path to the saved team page (.html): ")
@@ -400,8 +439,10 @@ def menu():
                 if result["kind"] == "directory":
                     print(f"  team directory — {len(result['teams'])} teams:")
                     for t in result["teams"]:
-                        print(f"    {t['team_id']:<6} {t['team']}")
-                    print("  open one of these in your browser and save that page")
+                        print(f"    {t['team_id']:<6} {t['team']:<34} "
+                              f"{t.get('division', '')}")
+                    print("  no account IDs on this page — open one of these "
+                          "team pages in your browser and paste/save that page")
                 elif not result["players"]:
                     print("  no players found — if the page needs JavaScript, copy "
                           "it from devtools (right-click <html> -> Copy element)")

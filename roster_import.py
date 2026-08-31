@@ -44,6 +44,9 @@ DSE_TEAM_CARD_ALT = re.compile(          # href before class
     r'<a[^>]*href="([^"]*?/teams/(\d+)/?[^"]*)"[^>]*class="[^"]*team-card[^"]*"[^>]*>(.*?)</a>',
     re.I | re.S)
 DSE_TEAM_NAME = re.compile(r'class="team-card__name"[^>]*>(.*?)<', re.I | re.S)
+DSE_DIVISION = re.compile(
+    r'<section[^>]*class="[^"]*directory-division[^"]*"[^>]*aria-labelledby="division-([^"]*)"',
+    re.I)
 
 # --- generic fallback
 GENERIC = (
@@ -120,11 +123,30 @@ def parse_dse_team(html):
     return {"team": team_name_from(html), "players": players}
 
 
+def _division_spans(html):
+    """[(division_name, start, end)] for each directory section."""
+    marks = [(m.group(1), m.start()) for m in DSE_DIVISION.finditer(html)]
+    spans = []
+    for i, (name, start) in enumerate(marks):
+        end = marks[i + 1][1] if i + 1 < len(marks) else len(html)
+        spans.append((html_mod.unescape(name).strip(), start, end))
+    return spans
+
+
 def parse_dse_directory(html):
     """
     The all-teams directory page.
-    -> [{'team': str, 'team_id': int, 'url': str}]
+    -> [{'team': str, 'team_id': int, 'url': str, 'division': str}]
+    No account IDs live here -- only team names and team IDs.
     """
+    spans = _division_spans(html)
+
+    def division_at(pos):
+        for name, start, end in spans:
+            if start <= pos < end:
+                return name
+        return ""
+
     teams, seen = [], set()
     for pattern in (DSE_TEAM_CARD, DSE_TEAM_CARD_ALT):
         for m in pattern.finditer(html):
@@ -137,6 +159,7 @@ def parse_dse_directory(html):
                 "team": strip_tags(name.group(1)) if name else strip_tags(body)[:40],
                 "team_id": team_id,
                 "url": url,
+                "division": division_at(m.start()),
             })
 
     # last resort: any /teams/<id>/ link with text
@@ -150,9 +173,23 @@ def parse_dse_directory(html):
             if not label:
                 continue
             seen.add(tid)
-            teams.append({"team": label[:40], "team_id": tid, "url": m.group(1)})
+            teams.append({"team": label[:40], "team_id": tid,
+                          "url": m.group(1), "division": division_at(m.start())})
 
     return sorted(teams, key=lambda t: t["team"].lower())
+
+
+def find_teams(directory, query):
+    """Case-insensitive substring lookup over parse_dse_directory() output."""
+    q = re.sub(r"\s+", "", (query or "").lower())
+    if not q:
+        return list(directory)
+    out = []
+    for t in directory:
+        flat = re.sub(r"\s+", "", t["team"].lower())
+        if q in flat:
+            out.append(t)
+    return out
 
 
 def parse_roster(html):
@@ -393,3 +430,63 @@ if __name__ == "__main__":
                                     "region": ""} for p in players}
         print()
         run(ids, days=14, top=5, match_mode="private_lobby", labels=labels)
+
+
+# --------------------------------------------------------------- bundles
+
+# One saved page per team is 180 downloads. Instead, the harvester below runs
+# in the browser on the directory page, fetches every team page in your own
+# logged-in session, keeps only the roster markup, and downloads it as a
+# single small bundle. Python still does the real parsing, using the same
+# regexes as a single page - the browser only fetches and trims.
+
+BUNDLE_MARK = re.compile(
+    r"<!--\s*DSE-TEAM\s*\|\s*(\d+)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*-->",
+    re.I)
+
+HARVESTER = (
+    "javascript:(async function(){"
+    "const cards=[...document.querySelectorAll('a.team-card')];"
+    "if(!cards.length){alert('Run this on the team directory page.');return;}"
+    "const out=[];let done=0;"
+    "for(const c of cards){"
+    "const id=(c.getAttribute('href').match(/teams\\/(\\d+)/)||[])[1];"
+    "const nm=(c.querySelector('.team-card__name')||{}).textContent||'';"
+    "const sec=c.closest('.directory-division');"
+    "const dv=sec?(sec.getAttribute('aria-labelledby')||'').replace(/^division-/,''):'';"
+    "try{const r=await fetch(c.href,{credentials:'same-origin'});const t=await r.text();"
+    "const arts=t.match(/<article[^>]*class=\"[^\"]*roster-player[^\"]*\"[\\s\\S]*?<\\/article>/gi)||[];"
+    "out.push('<!-- DSE-TEAM | '+id+' | '+nm.trim()+' | '+dv+' -->');"
+    "out.push(arts.join('\\n'));}catch(e){}"
+    "done++;if(done%10===0)console.log('fetched '+done+'/'+cards.length);"
+    "await new Promise(r=>setTimeout(r,150));}"
+    "const blob=new Blob([out.join('\\n')],{type:'text/html'});"
+    "const a=document.createElement('a');a.href=URL.createObjectURL(blob);"
+    "a.download='dse_rosters.html';a.click();"
+    "alert('Harvested '+done+' teams.');})()"
+)
+
+
+def parse_bundle(html):
+    """
+    A harvested bundle: many teams' roster markup in one file, separated by
+    <!-- DSE-TEAM | id | name | division --> markers.
+    -> [{'team','team_id','division','players':[...]}]
+    """
+    marks = list(BUNDLE_MARK.finditer(html))
+    teams = []
+    for i, m in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(html)
+        chunk = html[m.end():end]
+        players = parse_dse_team(chunk)["players"]
+        teams.append({
+            "team": html_mod.unescape(m.group(2)).strip(),
+            "team_id": int(m.group(1)),
+            "division": html_mod.unescape(m.group(3)).strip(),
+            "players": players,
+        })
+    return teams
+
+
+def is_bundle(html):
+    return bool(BUNDLE_MARK.search(html or ""))
