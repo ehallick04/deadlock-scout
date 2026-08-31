@@ -212,6 +212,12 @@ def parse_roster(html):
     return found
 
 
+def looks_like_markup(text):
+    """Enough tags to be a page rather than a clipboard paste."""
+    sample = (text or "")[:20000]
+    return len(re.findall(r"<(?:a|div|span|article|li|table)\b", sample, re.I)) >= 3
+
+
 def parse_any(html):
     """
     Work out what kind of page this is.
@@ -227,8 +233,10 @@ def parse_any(html):
     if directory:
         return {"kind": "directory", "team": "", "players": [], "teams": directory}
 
-    # a Ctrl+A / Ctrl+C paste rather than markup
-    pasted = parse_pasted(html)
+    # a Ctrl+A / Ctrl+C paste rather than markup. Guarded: on real markup it
+    # would swallow tags into urls and read the next tag as a player name, so
+    # only run it on text that is not obviously HTML.
+    pasted = {"players": []} if looks_like_markup(html) else parse_pasted(html)
     if pasted["players"]:
         return {"kind": "pasted", "team": pasted["team"],
                 "region": pasted.get("region", ""),
@@ -273,7 +281,7 @@ BOOKMARKLET = (
 )
 
 MD_LINK = re.compile(r"\[([^\]]*)\]\((https?://[^)]+)\)")
-BARE_URL = re.compile(r"https?://[^\s)]+")
+BARE_URL = re.compile(r'''https?://[^\s)"'<>]+''')
 
 ROLE_HEADINGS = (
     ("point of contact", "POC"),
