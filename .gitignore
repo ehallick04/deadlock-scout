@@ -4,7 +4,13 @@ __pycache__/
 heroes.json
 cache/
 *.csv
+*.gz
 ids.txt
 Ids.txt
 .agents/
 .claude/
+
+# harvested source pages are inputs, not the deliverable --
+# rosters.json IS committed on purpose, so it is not listed here
+dse_rosters.html
+pages/
