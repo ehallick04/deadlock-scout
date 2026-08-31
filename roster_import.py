@@ -13,7 +13,9 @@ GETTING THE PAGE
       - save it: Ctrl+S -> "Webpage, Complete", then point this at the file.
 
 USAGE
-    python roster_import.py page.html              # show what it found
+    python roster_import.py page.txt               # a Ctrl+A/Ctrl+C paste
+    python roster_import.py page.html              # a saved page
+    python roster_import.py --bookmarklet          # one-click copy button
     python roster_import.py page.html --run        # ...and report on them
     python roster_import.py page.html --save       # print a teams.py block
 """
@@ -188,6 +190,13 @@ def parse_any(html):
     if directory:
         return {"kind": "directory", "team": "", "players": [], "teams": directory}
 
+    # a Ctrl+A / Ctrl+C paste rather than markup
+    pasted = parse_pasted(html)
+    if pasted["players"]:
+        return {"kind": "pasted", "team": pasted["team"],
+                "region": pasted.get("region", ""),
+                "players": pasted["players"], "teams": []}
+
     generic = parse_roster(html)
     return {"kind": "generic", "team": team_name_from(html),
             "players": generic, "teams": []}
@@ -208,6 +217,126 @@ def as_teams_entry(team_name, region, players):
     return "\n".join(lines)
 
 
+# --------------------------------------------------------------- pasting
+
+# Ctrl+C puts TWO flavours on the clipboard: plain text (no links) and rich
+# text (links intact). Pasting into a plain text box usually yields the rich
+# flavour rendered as markdown - [name](url) - which still carries the ids.
+# So we parse that shape as well as raw HTML.
+
+# One click, if a page ever resists copying: make a bookmark whose URL is this
+# whole line, open the page, click it, then paste.
+BOOKMARKLET = (
+    "javascript:(function(){const h=document.documentElement.outerHTML;"
+    "navigator.clipboard.writeText(h).then(function(){"
+    "alert('Copied '+h.length+' characters of page HTML');},function(){"
+    "const t=document.createElement('textarea');t.value=h;"
+    "document.body.appendChild(t);t.select();document.execCommand('copy');"
+    "t.remove();alert('Copied '+h.length+' characters');});})();"
+)
+
+MD_LINK = re.compile(r"\[([^\]]*)\]\((https?://[^)]+)\)")
+BARE_URL = re.compile(r"https?://[^\s)]+")
+
+ROLE_HEADINGS = (
+    ("point of contact", "POC"),
+    ("core player", "Core"),
+    ("substitute", "Sub"),
+    ("bench", "Sub"),
+)
+
+SKIP_LINES = {"pronouns", "steam", "not set", "team roster", "team profile",
+              "leadership", "match lineup", "bench depth", "account"}
+
+REGIONS = (("north america", "NA"), ("europe", "EU"), ("oceania", "OCE"),
+           ("asia", "ASIA"), ("south america", "SA"))
+
+
+def _clean(text):
+    return re.sub(r"\s+", " ", html_mod.unescape(text or "")).strip(" \u2197 ").strip()
+
+
+def parse_pasted(text):
+    """
+    Parse a Ctrl+A / Ctrl+C paste of a team page.
+
+    -> {'team', 'region', 'players': [{'account_id','ign','persona','role'}]}
+    """
+    players, role, team, region = [], "", "", ""
+    lines = [ln.strip() for ln in text.splitlines()]
+
+    for i, line in enumerate(lines):
+        low = line.lower()
+
+        # team name sits on the line after "Team profile"
+        if low == "team profile":
+            for nxt in lines[i + 1:i + 3]:
+                if nxt and not nxt.lower().startswith("active roster"):
+                    team = _clean(re.sub(r"\(.*?\)|\[.*?\]", "", nxt))
+                    break
+
+        for needle, code in REGIONS:
+            if needle in low and not region:
+                region = code
+
+        for needle, label in ROLE_HEADINGS:
+            # a heading is a short standalone line, not a sentence
+            if low.startswith(needle) and len(line) < 40:
+                role = label
+
+        for m in MD_LINK.finditer(line):
+            label, url = m.group(1), m.group(2)
+            got = re.search(r"statlocker\.gg/profile/(\d+)", url)
+            if got:
+                players.append({"account_id": int(got.group(1)),
+                                "ign": _clean(label), "persona": "",
+                                "role": role, "url": url})
+                continue
+
+            steam = re.search(r"steamcommunity\.com/profiles/(\d{17})", url)
+            if steam:
+                account_id = to_account_id(steam.group(1), "id64")
+                if players and players[-1]["account_id"] == account_id:
+                    players[-1].setdefault("steam_name", _clean(label))
+                elif not any(p["account_id"] == account_id for p in players):
+                    # a Steam link with no statlocker link beside it
+                    players.append({"account_id": account_id,
+                                    "ign": _clean(label), "persona": "",
+                                    "role": role, "url": url})
+
+        # bare urls, for clipboards that drop the markdown wrapper
+        if not MD_LINK.search(line):
+            for url in BARE_URL.finditer(line):
+                got = re.search(r"statlocker\.gg/profile/(\d+)", url.group(0))
+                if got and not any(p["account_id"] == int(got.group(1))
+                                   for p in players):
+                    players.append({"account_id": int(got.group(1)), "ign": "",
+                                    "persona": "", "role": role,
+                                    "url": url.group(0)})
+
+    # the line right after a player's link is their Steam persona
+    for p in players:
+        for i, line in enumerate(lines):
+            if p["url"] in line:
+                for nxt in lines[i + 1:i + 3]:
+                    low = nxt.lower().strip()
+                    if nxt and low not in SKIP_LINES and not MD_LINK.search(nxt):
+                        p["persona"] = _clean(nxt)
+                        break
+                break
+
+    # de-duplicate, keeping the first (statlocker) entry per player
+    seen, unique = set(), []
+    for p in players:
+        if p["account_id"] in seen:
+            continue
+        seen.add(p["account_id"])
+        p["ign"] = p["ign"] or p.get("steam_name", "") or p["persona"]
+        unique.append(p)
+
+    return {"team": team, "region": region, "players": unique}
+
+
 def read_html(path):
     with open(path, encoding="utf-8", errors="replace") as f:
         return f.read()
@@ -218,6 +347,12 @@ if __name__ == "__main__":
     if not args:
         print(__doc__)
         sys.exit(1)
+
+    if args[0] == "--bookmarklet":
+        print("Make a new browser bookmark and paste this as its URL:\n")
+        print(BOOKMARKLET)
+        print("\nThen open a team page, click the bookmark, and paste.")
+        sys.exit()
 
     try:
         page = read_html(args[0])

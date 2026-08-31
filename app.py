@@ -20,7 +20,7 @@ from deadlock import (
     WITH_CUSTOMS, build_report, build_team_report, flatten, hero_totals,
     parse_ids,
 )
-from roster_import import parse_any
+from roster_import import BOOKMARKLET, parse_any
 from teams import TEAMS, choices, roster
 
 st.set_page_config(page_title="Deadlock Scout", page_icon="🔒", layout="wide")
@@ -89,17 +89,26 @@ if preset == CUSTOM_ENTRY:
         help="One per line. Steam friend codes work directly.",
     )
     st.sidebar.markdown("**Import a team page**")
+
     pasted = st.sidebar.text_area(
         "Paste a team page here",
         height=90,
-        placeholder="Open the team page, Ctrl+A then Ctrl+C, and paste it here",
-        help="Works with DSE player-portal team pages and the all-teams "
-             "directory. Nothing is fetched — this only reads what you paste.",
+        placeholder="Open the team page, Ctrl+A then Ctrl+C, and paste here",
+        help="Works with a plain Ctrl+A/Ctrl+C paste, a saved page, or the "
+             "all-teams directory. Nothing is fetched — it only reads what "
+             "you paste.",
     )
     uploaded = st.sidebar.file_uploader(
         "...or upload a list / saved page", type=["txt", "csv", "html", "htm"])
 
+    with st.sidebar.expander("If a page will not copy"):
+        st.caption("Make a bookmark with this as its URL, open the page, "
+                   "click it, then paste above. Only needed if a plain "
+                   "Ctrl+A/Ctrl+C comes out without links.")
+        st.code(BOOKMARKLET, language="javascript")
+
     page_text = pasted or ""
+
     if uploaded is not None:
         text = uploaded.getvalue().decode("utf-8", errors="replace")
         if uploaded.name.lower().endswith((".html", ".htm")) or "<a " in text.lower():
