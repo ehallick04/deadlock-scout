@@ -9,7 +9,7 @@ Player ids are Steam friend codes / SteamID3 account ids.
 
 TEAMS = {
     # ---------------------------------------------------------- NA
-    "Poppers pupils": {
+    "Poppers Pupils": {
         "region": "NA",
         "players": {
             "Zeno": 1730032433,
@@ -20,7 +20,7 @@ TEAMS = {
             "Poppers": 1929248273,
         },
     },
-    "Melee creeps": {
+    "Melee Creeps": {
         "region": "NA",
         "players": {
             "JonJon": 244109796,
