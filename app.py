@@ -11,14 +11,16 @@ Run locally:
 Deploy free: push this folder to GitHub, then connect it at share.streamlit.io
 """
 
+import time
+
 import pandas as pd
 import streamlit as st
 
 from api import cache_info, clear_cache, export_cache, import_cache
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
-    WITH_CUSTOMS, build_report, build_team_report, flatten, hero_totals,
-    parse_ids,
+    WITH_CUSTOMS, build_report, build_team_report, composition_counts,
+    flatten, hero_totals, match_compositions, parse_ids,
 )
 from roster_import import BOOKMARKLET, parse_any
 from teams import TEAMS, REGIONS, roster_many, team_names
@@ -334,8 +336,15 @@ if meta:
 WINRATE_COL = st.column_config.ProgressColumn(
     "Win rate", format="%.1f%%", min_value=0, max_value=100)
 
-tab_hero, tab_player, tab_team, tab_data = st.tabs(
-    ["By hero", "By player", "By team", "Raw data"])
+@st.cache_data(ttl=900, show_spinner=False)
+def load_comps(match_ids, roster_ids, labels_tuple, limit):
+    labels = {k: dict(v) for k, v in labels_tuple}
+    return match_compositions(list(match_ids), list(roster_ids), labels,
+                              limit=limit)
+
+
+tab_hero, tab_player, tab_team, tab_match, tab_data = st.tabs(
+    ["By hero", "By player", "By team", "Matches", "Raw data"])
 
 # ---- pooled hero win rates
 with tab_hero:
@@ -430,6 +439,65 @@ with tab_team:
                     "win_rate": WINRATE_COL,
                 },
             )
+
+# ---- individual match lineups
+with tab_match:
+    match_ids = (meta or {}).get("match_ids") or []
+    if not match_ids:
+        st.info("Tick **Only games they played together** and rebuild to see "
+                "individual match lineups.")
+    else:
+        how_many = whole_number(
+            st.text_input("How many matches to load", value="10"),
+            10, "Matches", minimum=1, maximum=60)
+        st.caption(f"{len(match_ids)} qualifying matches. Loading lineups "
+                   f"costs one request each, cached afterwards.")
+
+        if st.button("Load lineups"):
+            with st.spinner("Reading match lineups..."):
+                st.session_state.comps = load_comps(
+                    tuple(match_ids), tuple(ids),
+                    tuple(sorted((k, tuple(sorted(v.items())))
+                                 for k, v in labels.items())),
+                    how_many)
+
+        comps = st.session_state.get("comps") or []
+        if comps:
+            counts = pd.DataFrame(composition_counts(comps, ids))
+            if not counts.empty:
+                st.markdown("**Heroes they build around**")
+                st.dataframe(
+                    counts, hide_index=True, use_container_width=True,
+                    column_config={
+                        "hero": "Hero",
+                        "games": st.column_config.NumberColumn("Games"),
+                        "wins": st.column_config.NumberColumn("Wins"),
+                        "win_rate": WINRATE_COL,
+                    })
+
+            st.markdown("**Lineups**")
+            for m in comps:
+                when = (time.strftime("%b %d", time.localtime(m["start_time"]))
+                        if m.get("start_time") else "")
+                mins = f"{m['duration_s'] // 60} min" if m.get("duration_s") else ""
+                ours = m.get("side_names", {}).get(m.get("our_side"), "")
+                result = ("" if m["winner"] is None else
+                          (" — WIN" if m["our_side"] == m["winner"] else " — LOSS"))
+                header = f"{ours or 'match'} {result}  ·  {when} {mins}  ·  {m['match_id']}"
+
+                with st.expander(header.strip()):
+                    order = [m["our_side"]] if m["our_side"] is not None else []
+                    order += [x for x in sorted(m["sides"]) if x not in order]
+                    cols = st.columns(len(order))
+                    for col, side in zip(cols, order):
+                        label = m.get("side_names", {}).get(side) or f"Side {side}"
+                        won = ("" if m["winner"] is None else
+                               ("  ✅" if side == m["winner"] else "  ❌"))
+                        col.markdown(f"**{label}**{won}")
+                        col.dataframe(
+                            pd.DataFrame([{"player": p["name"], "hero": p["hero"]}
+                                          for p in m["sides"][side]]),
+                            hide_index=True, use_container_width=True)
 
 # ---- everything, downloadable
 with tab_data:
