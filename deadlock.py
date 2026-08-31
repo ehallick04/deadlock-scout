@@ -284,8 +284,11 @@ def flatten(players):
     """Nested report -> flat rows, one per player+hero. For CSV or pandas."""
     return [
         {"account_id": p["account_id"],
+         "row_key": p.get("row_key", str(p["account_id"])),
          "ign": p.get("ign", ""),
          "team": p.get("team", ""),
+         "sub_for": p.get("sub_for", ""),
+         "home_team": p.get("home_team", ""),
          "region": p.get("region", ""),
          "is_sub": p.get("is_sub", False),
          "persona_name": p.get("persona_name", ""),
@@ -305,7 +308,7 @@ def hero_totals(players):
         for h in p["heroes"]:
             row = pool.setdefault(h["hero"], {"hero": h["hero"], "players": set(),
                                               "matches": 0, "wins": 0})
-            row["players"].add(p["account_id"])
+            row["players"].add(p.get("row_key", p["account_id"]))
             row["matches"] += h["matches"]
             row["wins"] += h["wins"]
 
@@ -352,50 +355,41 @@ def shared_match_ids(by_player, min_players=4):
     return {mid for mid, n in counts.items() if n >= min_players}, counts
 
 
-def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
-                      labels=None, match_mode=CUSTOMS_ONLY, include_subs=False,
-                      min_sub_games=1):
+def _team_block(members, team_label, region, days, top, min_players,
+                match_mode, include_subs, min_sub_games, by_player, names):
     """
-    Same shape as build_report, but restricted to matches where at least
-    `min_players` of this roster were in the same game.
-
-    Costs one batched hero-stats call plus one match-history call per
-    player (100 req/s, so cheap). match-history is what supplies the
-    per-match hero and win/loss; hero-stats supplies the authoritative
-    set of custom match ids.
+    One team's report. `members` are that team's roster ids ONLY, so a pro
+    from another team who stands in here is correctly seen as an outsider.
     """
-    labels = labels or {}
-    names = hero_names()
-    profiles = steam_profiles(account_ids)
+    from teams import find_player
 
-    by_player = custom_match_ids(account_ids, days, match_mode)
-    shared, counts = shared_match_ids(by_player, min_players)
+    own = {aid: by_player.get(aid, set()) for aid in members}
+    shared, counts = shared_match_ids(own, min_players)
 
-    # who stood in?
     subs, participants = {}, {}
-    report_ids = list(account_ids)
+    rows = list(members)
+    sub_meta = {}
+
     if include_subs and shared:
         participants = match_participants(shared)
-        subs = find_subs(participants, account_ids, min_sub_games)
-
-        team_label = next((labels[i]["team"] for i in account_ids
-                           if labels.get(i, {}).get("team")), "")
-        region = next((labels[i]["region"] for i in account_ids
-                       if labels.get(i, {}).get("region")), "")
-        labels = dict(labels)
+        subs = find_subs(participants, members, min_sub_games)
         for aid, row in sorted(subs.items(), key=lambda kv: -kv[1]["games"]):
-            report_ids.append(aid)
-            labels[aid] = {"ign": "", "team": f"{team_label} (sub)".strip(),
-                           "region": region}
-            by_player[aid] = row["with"]
+            rows.append(aid)
+            by_player[aid] = by_player.get(aid, set()) | row["with"]
+            home = find_player(aid)
+            sub_meta[aid] = {
+                "ign": home["ign"] if home else "",
+                "home_team": home["team"] if home else "",
+            }
 
-    profiles = steam_profiles(report_ids)
     since = int(time.time()) - days * 86400
     players = []
 
-    for account_id in report_ids:
+    for account_id in rows:
+        is_sub = account_id in subs
         own_customs = by_player.get(account_id, set())
-        own_shared = own_customs & shared
+        own_shared = (subs[account_id]["with"] if is_sub
+                      else own_customs & shared)
 
         tally = {}
         if own_shared:
@@ -430,15 +424,18 @@ def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
             })
 
         info = get_rank(account_id)
-        label = labels.get(account_id, {})
-        is_sub = account_id in subs
+        meta = sub_meta.get(account_id, {})
         players.append({
             "account_id": account_id,
-            "ign": label.get("ign", "") or ("sub" if is_sub else ""),
-            "team": label.get("team", ""),
-            "region": label.get("region", ""),
+            # a player can appear once per team context, so identity is the
+            # PAIR of account and team - not the account alone
+            "row_key": f"{account_id}@{team_label}" + ("+sub" if is_sub else ""),
+            "ign": meta.get("ign", ""),
+            "team": f"{team_label} (sub)" if is_sub else team_label,
+            "sub_for": team_label if is_sub else "",
+            "home_team": meta.get("home_team", "") if is_sub else team_label,
+            "region": region,
             "is_sub": is_sub,
-            "persona_name": profiles.get(account_id, {}).get("personaname", ""),
             "rank_label": info["rank_label"],
             "rank": info["rank"],
             "subrank": info["subrank"],
@@ -449,14 +446,64 @@ def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
             "heroes": hero_rows,
         })
 
+    return players, shared, counts, subs, len(participants)
+
+
+def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
+                      labels=None, match_mode=CUSTOMS_ONLY, include_subs=False,
+                      min_sub_games=1):
+    """
+    Matches where a roster played together, computed PER TEAM.
+
+    Running per team matters once more than one team is selected: a pro who
+    stands in for another team must be an outsider relative to THAT team,
+    otherwise their sub games get absorbed into their own team's numbers and
+    no sub is ever reported. It also means one person can legitimately appear
+    twice - once for their own team, once as a stand-in elsewhere - as
+    separate rows rather than one merged player.
+    """
+    labels = labels or {}
+    names = hero_names()
+
+    # group the selection by team
+    groups = {}
+    for aid in account_ids:
+        groups.setdefault(labels.get(aid, {}).get("team", ""), []).append(aid)
+
+    by_player = custom_match_ids(account_ids, days, match_mode)
+
+    all_players, all_shared, all_counts, all_subs = [], set(), Counter(), {}
+    inspected = 0
+
+    for team_label, members in groups.items():
+        region = next((labels[a].get("region", "") for a in members
+                       if labels.get(a)), "")
+        players, shared, counts, subs, n = _team_block(
+            members, team_label, region, days, top, min_players, match_mode,
+            include_subs, min_sub_games, by_player, names)
+
+        all_players += players
+        all_shared |= shared
+        all_counts.update(counts)
+        inspected += n
+        for aid, row in subs.items():
+            all_subs.setdefault((aid, team_label), row["games"])
+
+    # names are looked up once, for everyone in the final report
+    profiles = steam_profiles([p["account_id"] for p in all_players])
+    for p in all_players:
+        p["persona_name"] = profiles.get(p["account_id"], {}).get("personaname", "")
+
     meta = {
-        "shared_matches": len(shared),
+        "shared_matches": len(all_shared),
         "min_players": min_players,
-        "stack_sizes": dict(sorted(Counter(counts.values()).items(), reverse=True)),
-        "subs": {aid: row["games"] for aid, row in subs.items()},
-        "matches_inspected": len(participants),
+        "stack_sizes": dict(sorted(Counter(all_counts.values()).items(),
+                                   reverse=True)),
+        "subs": {f"{aid}@{team}": n for (aid, team), n in all_subs.items()},
+        "matches_inspected": inspected,
+        "teams": list(groups),
     }
-    return players, meta
+    return all_players, meta
 
 
 # =====================================================================

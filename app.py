@@ -14,7 +14,7 @@ Deploy free: push this folder to GitHub, then connect it at share.streamlit.io
 import pandas as pd
 import streamlit as st
 
-from api import cache_info, clear_cache
+from api import cache_info, clear_cache, export_cache, import_cache
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
     WITH_CUSTOMS, build_report, build_team_report, flatten, hero_totals,
@@ -140,6 +140,45 @@ with st.sidebar.expander("Cache"):
                f"oldest {info['oldest_hours']}h")
     st.caption("Fresh for: assets 7d · match metadata 1y · "
                "steam names 1d · ranks and stats 6h")
+
+    st.markdown("**Save / restore**")
+    st.caption("Hosting wipes this app's disk when it restarts. Download a "
+               "bundle now, upload it after, and the permanent data comes "
+               "straight back.")
+
+    permanent_only = st.checkbox("Permanent data only", value=True,
+                                 help="Assets and finished match metadata — "
+                                      "never goes stale, so the bundle keeps "
+                                      "working forever.")
+
+    if st.button("Prepare bundle", use_container_width=True):
+        blob, meta = export_cache(only_permanent=permanent_only)
+        st.session_state.bundle = blob
+        st.session_state.bundle_meta = meta
+
+    if "bundle" in st.session_state:
+        m = st.session_state.bundle_meta
+        st.caption(f"{m['entries']} entries · {m['megabytes']} MB"
+                   + (f" · {m['skipped']} skipped" if m["skipped"] else ""))
+        st.download_button(
+            "Download cache bundle",
+            st.session_state.bundle,
+            file_name="deadlock_cache.json.gz",
+            mime="application/gzip",
+            use_container_width=True,
+        )
+
+    restore = st.file_uploader("Restore a bundle", type=["gz"],
+                               key="cache_upload")
+    if restore is not None:
+        try:
+            result = import_cache(restore.getvalue())
+            st.success(f"Restored {result['added']} entries "
+                       f"({result['skipped_existing']} already present, "
+                       f"{result['skipped_stale']} too old).")
+        except Exception as e:
+            st.error(f"Not a valid cache bundle: {e}")
+
     if st.button("Clear cache", use_container_width=True):
         removed = clear_cache()
         st.cache_data.clear()
@@ -190,7 +229,7 @@ if not rows:
 df = pd.DataFrame(rows)
 
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Players", df["account_id"].nunique())
+c1.metric("Player slots", df["row_key"].nunique())
 c2.metric("Matches", int(df["matches"].sum()))
 c3.metric("Distinct heroes", df["hero"].nunique())
 c4.metric("Overall win rate",
@@ -230,11 +269,10 @@ with tab_hero:
 # ---- per player
 with tab_player:
     for p in players:
-        who = p.get("persona_name") or f"Account {p['account_id']}"
-        if p.get("ign") and p["ign"] != "sub":
-            who = p["ign"]
+        who = p.get("ign") or p.get("persona_name") or f"Account {p['account_id']}"
         if p.get("is_sub"):
-            who = f"{who}  ⟨SUB⟩"
+            home = f" of {p['home_team']}" if p.get("home_team") else ""
+            who = f"{who}  ⟨SUB for {p['sub_for']}{home}⟩"
         team = f" · {p['team']}" if p.get("team") else ""
         extra = (f" ({p['team_matches']} of {p['custom_matches']} customs)"
                  if "team_matches" in p else "")
@@ -260,10 +298,11 @@ with tab_team:
     if not df["team"].astype(str).str.strip().any():
         st.info("Pick a Pros roster to see team breakdowns.")
     else:
-        for team in [t for t in df["team"].unique() if t]:
-            sub = df[df["team"] == team]
+        df["base_team"] = df["team"].str.replace(" (sub)", "", regex=False)
+        for team in [t for t in df["base_team"].unique() if t]:
+            sub = df[df["base_team"] == team]
             agg = (sub.groupby("hero", as_index=False)
-                      .agg(players=("account_id", "nunique"),
+                      .agg(players=("row_key", "nunique"),
                            matches=("matches", "sum"),
                            wins=("wins", "sum")))
             agg["win_rate"] = (agg["wins"] / agg["matches"] * 100).round(1)

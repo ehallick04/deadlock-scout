@@ -103,3 +103,15 @@ def roster(selection):
 def choices():
     """Everything you can pick, in menu order."""
     return ["All", *REGIONS, *team_names()]
+
+
+def find_player(account_id):
+    """
+    Is this account on any roster? -> {"ign", "team", "region"} or None.
+    Used to recognise a sub who is themselves a pro on another team.
+    """
+    for team, info in TEAMS.items():
+        for ign, aid in info["players"].items():
+            if aid == account_id:
+                return {"ign": ign, "team": team, "region": info["region"]}
+    return None

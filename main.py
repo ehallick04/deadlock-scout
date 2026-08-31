@@ -21,6 +21,9 @@ data and formats it. No HTTP and no game logic lives here.
     python main.py 880934744 --history             # cross-check via match history
     python main.py --pros NA --refresh             # ignore the cache, pull live
     python main.py --clear-cache                   # empty cache/ and exit
+    python main.py --export-cache                  # save permanent data to a bundle
+    python main.py --export-cache all.gz --all     # save everything
+    python main.py --import-cache deadlock_cache.json.gz
 
 Responses are cached in cache/ and reused: assets for 7 days, finished match
 metadata for a year, steam names for a day, ranks and hero stats for 6 hours.
@@ -33,7 +36,7 @@ import csv
 import os
 import sys
 
-from api import cache_info, clear_cache
+from api import cache_info, clear_cache, export_cache, import_cache
 
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
@@ -118,13 +121,20 @@ def run_team(ids, days, top, min_players, labels, csv_path=None,
               f"{meta['matches_inspected']} inspected matches")
     print(f"{'=' * 58}")
 
+    last_team = None
     for p in players:
-        who = p.get("persona_name") or str(p["account_id"])
-        if p.get("ign") and p["ign"] != "sub":
-            who = p["ign"]
-        tag = "  *SUB*" if p.get("is_sub") else ""
-        team = f"  ({p['team']})" if p.get("team") else ""
-        print(f"\n  {who}{team}{tag}   [{p['account_id']}]   {p['rank_label']}")
+        base = p["team"].replace(" (sub)", "")
+        if base != last_team:
+            print(f"\n  --- {base or 'ungrouped'} ---")
+            last_team = base
+
+        who = p.get("ign") or p.get("persona_name") or str(p["account_id"])
+        if p.get("is_sub"):
+            home = f" of {p['home_team']}" if p.get("home_team") else ""
+            tag = f"  *SUB for {p['sub_for']}{home}*"
+        else:
+            tag = ""
+        print(f"\n  {who}{tag}   [{p['account_id']}]   {p['rank_label']}")
         print(f"  {p['team_matches']} team games of {p['custom_matches']} customs")
         if not p["heroes"]:
             print("    no qualifying matches")
@@ -319,11 +329,33 @@ def menu():
                   f"{info['megabytes']} MB, oldest {info['oldest_hours']}h old")
             print("  fresh for: assets 7d · match metadata 1y · "
                   "steam names 1d · everything else 6h")
-            what = ask("  clear it? (a=all, s=stale only, blank=keep): ")
-            if what and what.lower().startswith("a"):
+            what = ask("  (e)xport  (i)mport  (a)ll-clear  (s)tale-clear  "
+                       "blank=keep: ")
+            w = (what or "").lower()[:1]
+            if w == "a":
                 print(f"  removed {clear_cache()} entries")
-            elif what and what.lower().startswith("s"):
+            elif w == "s":
                 print(f"  removed {clear_cache(older_than_hours=6)} entries")
+            elif w == "e":
+                only = not (ask("  everything, or permanent only? (P/e): ", "p")
+                            ).lower().startswith("e")
+                blob, m = export_cache(only_permanent=only)
+                with open("deadlock_cache.json.gz", "wb") as f:
+                    f.write(blob)
+                print(f"  wrote deadlock_cache.json.gz "
+                      f"({m['entries']} entries, {m['megabytes']} MB)")
+            elif w == "i":
+                path = ask("  bundle path (blank = deadlock_cache.json.gz): ",
+                           "deadlock_cache.json.gz")
+                found = find_file(path)
+                if found:
+                    try:
+                        r = import_cache(found)
+                        print(f"  restored {r['added']} "
+                              f"({r['skipped_existing']} present, "
+                              f"{r['skipped_stale']} too old)")
+                    except Exception as e:
+                        print(f"  not a valid bundle: {e}")
 
         elif choice == "1":
             raw = ask("  paste ids or URLs (space or comma separated): ")
@@ -421,6 +453,24 @@ def parse_args(args):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
+
+    if "--export-cache" in args:
+        i = args.index("--export-cache")
+        out = (args[i + 1] if len(args) > i + 1 and not args[i + 1].startswith("--")
+               else "deadlock_cache.json.gz")
+        blob, m = export_cache(only_permanent="--all" not in args)
+        with open(out, "wb") as f:
+            f.write(blob)
+        print(f"wrote {out} ({m['entries']} entries, {m['megabytes']} MB)")
+        sys.exit()
+
+    if "--import-cache" in args:
+        path = args[args.index("--import-cache") + 1]
+        r = import_cache(path)
+        print(f"restored {r['added']} entries "
+              f"({r['skipped_existing']} already present, "
+              f"{r['skipped_stale']} too old)")
+        sys.exit()
 
     if "--clear-cache" in args:
         print(f"removed {clear_cache()} cached responses")
