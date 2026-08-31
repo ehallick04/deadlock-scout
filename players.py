@@ -1,350 +1,282 @@
 """
-players.py — most-played heroes, win rates, and ranks for a list of players.
+app.py — the Deadlock scouting report as a web app.
 
-Accepts raw account ids OR statlocker profile URLs; the id is pulled out either way:
-    https://statlocker.gg/profile/880934744/matches?mode=standard  ->  880934744
+Another runner on top of deadlock.py, exactly like main.py. No HTTP and no
+game logic lives here; this file only collects input and displays results.
 
-    python players.py                                   # interactive menu
-    python players.py 880934744 104579843               # ids
-    python players.py https://statlocker.gg/profile/880934744/matches?mode=standard
-    python players.py --file ids.txt --days 30 --top 5
-    python players.py 880934744 --csv players.csv
+Run locally:
+    uv pip install streamlit pandas
+    streamlit run app.py
+
+Deploy free: push this folder to GitHub, then connect it at share.streamlit.io
 """
 
-import json
-import os
-import re
-import sys
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
+import pandas as pd
+import streamlit as st
 
-BASE = "https://api.deadlock-api.com"
-HEADERS = {"User-Agent": "my-deadlock-project/0.1", "Accept": "application/json"}
-API_KEY = os.environ.get("DEADLOCK_API_KEY")
+from deadlock import (
+    CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
+    WITH_CUSTOMS, build_report, build_team_report, flatten, hero_totals,
+    parse_ids,
+)
+from teams import TEAMS, choices, roster
 
-# Rank tiers in ascending order. rank 1 = Initiate ... rank 11 = Eternus.
-# Valve's own names are also available at /v1/assets/ranks if you'd rather pull them live.
-RANKS = [
-    "Initiate", "Seeker", "Acolyte", "Sentinel", "Mystic", "Ritualist",
-    "Emissary", "Oracle", "Phantom", "Ascendant", "Eternus",
+st.set_page_config(page_title="Deadlock Scout", page_icon="🔒", layout="wide")
+
+MATCH_MODES = [
+    "private_lobby",
+    "ranked,unranked,private_lobby",
+    "ranked,unranked",
+    "ranked",
+    "unranked",
+    "coop_bot",
 ]
 
+CUSTOM_ENTRY = "Custom — paste IDs"
 
-# --------------------------------------------------------------- http
 
-def get_json(path, **params):
-    """GET any endpoint. Returns parsed JSON."""
-    url = BASE + path
-    clean = {k: v for k, v in params.items() if v is not None}
-    if clean:
-        url += "?" + urllib.parse.urlencode(clean, doseq=True)
+@st.cache_data(ttl=900, show_spinner=False)
+def load(ids_tuple, days, top, match_mode, game_mode, labels_tuple):
+    """Cached so re-sorting a table doesn't re-hit the API."""
+    # labels_tuple is ((account_id, (("ign", ...), ("team", ...))), ...)
+    # dict(v) turns the inner pairs back into a dict -- without it,
+    # build_report gets tuples and .get() fails.
+    labels = {k: dict(v) for k, v in labels_tuple}
+    return build_report(list(ids_tuple), days=days, top=top,
+                        match_mode=match_mode, game_mode=game_mode,
+                        labels=labels), None
 
-    headers = dict(HEADERS)
-    if API_KEY:
-        headers["X-API-Key"] = API_KEY
 
-    req = urllib.request.Request(url, headers=headers)
-    for attempt in range(3):
+@st.cache_data(ttl=900, show_spinner=False)
+def load_team(ids_tuple, days, top, min_players, labels_tuple, include_subs):
+    """Only matches where several of the roster were in the same game."""
+    labels = {k: dict(v) for k, v in labels_tuple}
+    return build_team_report(list(ids_tuple), days=days, top=top,
+                             min_players=min_players, labels=labels,
+                             include_subs=include_subs)
+
+
+def whole_number(text, fallback, label, minimum=1, maximum=3650):
+    """Read a typed number, falling back with a warning instead of crashing."""
+    text = (text or "").strip()
+    if not text:
+        return fallback
+    if not text.isdigit() or not minimum <= int(text) <= maximum:
+        st.sidebar.warning(f"{label}: enter a number {minimum}–{maximum}. "
+                           f"Using {fallback}.")
+        return fallback
+    return int(text)
+
+
+# --------------------------------------------------------------- sidebar
+
+st.sidebar.header("Who")
+
+preset = st.sidebar.selectbox(
+    "Roster",
+    [CUSTOM_ENTRY, *choices()],
+    help="Pros presets pull custom-lobby games, where teams scrim.",
+)
+
+labels = {}
+if preset == CUSTOM_ENTRY:
+    raw = st.sidebar.text_area(
+        "Account IDs, friend codes, or statlocker URLs",
+        height=150,
+        placeholder="880934744\nhttps://statlocker.gg/profile/1170456491/matches",
+        help="One per line. Steam friend codes work directly.",
+    )
+    uploaded = st.sidebar.file_uploader("...or upload a list", type=["txt", "csv"])
+    if uploaded is not None:
+        raw = (raw or "") + "\n" + uploaded.getvalue().decode("utf-8", errors="replace")
+    ids = parse_ids((raw or "").replace(",", " ").split())
+    default_mode = WITH_CUSTOMS
+else:
+    ids, labels = roster(preset)
+    st.sidebar.success(f"{preset}: {len(ids)} players")
+    default_mode = CUSTOMS_ONLY
+
+st.sidebar.header("Filters")
+
+days = whole_number(
+    st.sidebar.text_input("Days to look back", value=str(DEFAULT_DAYS)),
+    DEFAULT_DAYS, "Days")
+
+top = whole_number(
+    st.sidebar.text_input("Heroes per player", value="5"),
+    5, "Heroes per player", minimum=1, maximum=50)
+
+match_mode = st.sidebar.selectbox(
+    "Match mode", MATCH_MODES, index=MATCH_MODES.index(default_mode))
+game_mode = st.sidebar.selectbox("Game mode", ["normal", "street_brawl"], index=0)
+
+together = st.sidebar.checkbox(
+    "Only games they played together",
+    value=(preset != CUSTOM_ENTRY),
+    help="Keeps only matches containing several of the selected players, "
+         "so pugs and inhouses with strangers drop out. Custom lobbies only.",
+)
+min_players = 4
+if together:
+    min_players = whole_number(
+        st.sidebar.text_input("Minimum players per match", value="4"),
+        4, "Minimum players", minimum=2, maximum=12)
+    include_subs = st.sidebar.checkbox(
+        "Find stand-ins",
+        value=False,
+        help="Reads each match's lineup to spot players who filled in on "
+             "the roster's side. Costs one request per match, so it is "
+             "slower.",
+    )
+else:
+    include_subs = False
+
+run = st.sidebar.button("Build report", type="primary", use_container_width=True)
+
+
+# --------------------------------------------------------------- main
+
+st.title("Deadlock Scouting Report")
+st.caption("Most-played heroes, win rates, and ranks — from the community Deadlock API.")
+
+if not ids:
+    st.info("Pick a roster, or paste player IDs in the sidebar to begin.")
+    st.stop()
+
+st.write(f"**{preset}** · {len(ids)} player(s) · last {days} days · "
+         f"`{match_mode}` · `{game_mode}`")
+
+if run:
+    label_key = tuple(sorted((k, tuple(sorted(v.items())))
+                             for k, v in labels.items()))
+    with st.spinner(f"Pulling data for {len(ids)} player(s)..."):
         try:
-            with urllib.request.urlopen(req, timeout=30) as r:
-                return json.load(r)
-        except urllib.error.HTTPError as e:
-            if e.code == 429 and attempt < 2:
-                wait = int(e.headers.get("Retry-After") or 2 ** (attempt + 1))
-                print(f"    rate limited, waiting {wait}s")
-                time.sleep(wait)
-                continue
-            raise
+            if together:
+                players, meta = load_team(tuple(ids), days, top,
+                                          min_players, label_key, include_subs)
+            else:
+                players, meta = load(tuple(ids), days, top, match_mode,
+                                     game_mode, label_key)
+            st.session_state.players = players
+            st.session_state.meta = meta
+        except Exception as e:
+            st.error(f"Could not reach the Deadlock API: {e}")
+            st.stop()
 
+if "players" not in st.session_state:
+    st.stop()
 
-# --------------------------------------------------------------- inputs
+players = st.session_state.players
+meta = st.session_state.get("meta")
+rows = flatten(players)
 
-def parse_ids(items):
-    """
-    Pull account ids out of whatever you throw at this: bare numbers,
-    statlocker profile URLs, comma- or space-separated lists.
-    """
-    ids = []
-    for item in items:
-        text = str(item)
-        # a statlocker/deadlock profile URL: take the id after /profile/
-        m = re.search(r"/profile/(\d+)", text)
-        if m:
-            ids.append(int(m.group(1)))
-            continue
-        # otherwise grab every run of digits that looks like an account id
-        for n in re.findall(r"\d{5,}", text):
-            ids.append(int(n))
-    return list(dict.fromkeys(ids))          # de-duplicate, keep order
+if not rows:
+    st.warning("No matches found in this window. Try more days, "
+               "or a different match mode.")
+    st.stop()
 
+df = pd.DataFrame(rows)
 
-def read_id_file(path):
-    with open(path, encoding="utf-8") as f:
-        return parse_ids(f.read().split())
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Players", df["account_id"].nunique())
+c2.metric("Matches", int(df["matches"].sum()))
+c3.metric("Distinct heroes", df["hero"].nunique())
+c4.metric("Overall win rate",
+          f"{df['wins'].sum() / df['matches'].sum() * 100:.1f}%")
 
+if meta:
+    if meta.get("subs"):
+        st.warning(f"**{len(meta['subs'])} stand-in(s)** detected across "
+                   f"{meta['matches_inspected']} matches — shown with a SUB tag.")
+    st.info(f"**Team games only** — {meta['shared_matches']} matches with at "
+            f"least {meta['min_players']} of the selected players. "
+            f"Stack sizes across all their customs: "
+            + ", ".join(f"{n} players in {c} matches"
+                        for n, c in meta["stack_sizes"].items()))
 
-# --------------------------------------------------------------- lookups
+WINRATE_COL = st.column_config.ProgressColumn(
+    "Win rate", format="%.1f%%", min_value=0, max_value=100)
 
-def rank_name(rank, subrank=None):
-    """9, 5 -> 'Phantom 5'.  Subrank stays a number."""
-    if rank is None:
-        return "Unknown"
-    if rank <= 0:
-        return "Unranked"
-    tier = RANKS[rank - 1] if rank <= len(RANKS) else f"Rank {rank}"
-    return f"{tier} {subrank}" if subrank else tier
+tab_hero, tab_player, tab_team, tab_data = st.tabs(
+    ["By hero", "By player", "By team", "Raw data"])
 
-
-def get_rank(account_id):
-    """-> dict with tier name, numbers, and the raw payload."""
-    try:
-        r = get_json(f"/v1/players/{account_id}/rank")
-    except urllib.error.HTTPError as e:
-        return {"account_id": account_id, "rank_label": f"none (HTTP {e.code})",
-                "rank": None, "subrank": None, "badge": None}
-    return {
-        "account_id": account_id,
-        "rank_label": rank_name(r.get("rank"), r.get("subrank")),
-        "rank": r.get("rank"),
-        "subrank": r.get("subrank"),
-        "badge": r.get("badge"),
-    }
-
-
-def hero_names():
-    """{hero_id: name}, from local heroes.json if present, else fetched once."""
-    if os.path.exists("heroes.json"):
-        with open("heroes.json", encoding="utf-8") as f:
-            heroes = json.load(f)
-    else:
-        heroes = get_json("/v1/assets/heroes")
-        with open("heroes.json", "w", encoding="utf-8") as f:
-            json.dump(heroes, f, ensure_ascii=False)
-    return {h["id"]: h.get("name") or h.get("class_name") for h in heroes}
-
-
-# --------------------------------------------------------------- hero stats
-
-def hero_stats(account_ids, days=30, match_mode=None):
-    """
-    Per-hero matches_played / wins for these players over the last `days`.
-    One batched call: /v1/players/hero-stats takes multiple account_ids.
-    """
-    since = int(time.time()) - days * 86400
-    return get_json(
-        "/v1/players/hero-stats",
-        account_ids=",".join(str(i) for i in account_ids),
-        min_unix_timestamp=since,
-        match_mode=match_mode,
+# ---- pooled hero win rates
+with tab_hero:
+    st.caption("Every hero in the group's top picks, pooled across players.")
+    totals = pd.DataFrame(hero_totals(players))
+    st.dataframe(
+        totals, hide_index=True, use_container_width=True,
+        column_config={
+            "hero": "Hero",
+            "players": st.column_config.NumberColumn("Players"),
+            "matches": st.column_config.NumberColumn("Played"),
+            "wins": st.column_config.NumberColumn("Wins"),
+            "win_rate": WINRATE_COL,
+        },
     )
 
+# ---- per player
+with tab_player:
+    for p in players:
+        who = p.get("persona_name") or f"Account {p['account_id']}"
+        if p.get("ign") and p["ign"] != "sub":
+            who = p["ign"]
+        if p.get("is_sub"):
+            who = f"{who}  ⟨SUB⟩"
+        team = f" · {p['team']}" if p.get("team") else ""
+        extra = (f" ({p['team_matches']} of {p['custom_matches']} customs)"
+                 if "team_matches" in p else "")
+        header = (f"**{who}**{team} — {p['rank_label']} · "
+                  f"{p['total_matches']} matches{extra}")
+        with st.expander(header, expanded=len(players) <= 6):
+            if not p["heroes"]:
+                st.write("No matches in this window.")
+                continue
+            st.dataframe(
+                pd.DataFrame(p["heroes"])[["hero", "matches", "wins", "win_rate"]],
+                hide_index=True, use_container_width=True,
+                column_config={
+                    "hero": "Hero",
+                    "matches": st.column_config.NumberColumn("Played"),
+                    "wins": st.column_config.NumberColumn("Wins"),
+                    "win_rate": WINRATE_COL,
+                },
+            )
 
-def hero_stats_from_history(account_id, days=30):
-    """
-    Fallback: aggregate the player's own match history locally.
-    player_match_outcome is authoritative: 1 = win, 2 = loss.
-    """
-    since = int(time.time()) - days * 86400
-    history = get_json(f"/v1/players/{account_id}/match-history")
-
-    tally = {}
-    for m in history:
-        if m.get("start_time", 0) < since:
-            continue
-        outcome = m.get("player_match_outcome")
-        if outcome not in (1, 2):          # skip abandons / unscored
-            continue
-        row = tally.setdefault(m["hero_id"], {"hero_id": m["hero_id"],
-                                              "matches_played": 0, "wins": 0})
-        row["matches_played"] += 1
-        row["wins"] += 1 if outcome == 1 else 0
-
-    for row in tally.values():
-        row["account_id"] = account_id
-    return list(tally.values())
-
-
-# --------------------------------------------------------------- report
-
-def report(account_ids, days=30, top=5, use_history=False, csv_path=None):
-    names = hero_names()
-
-    if use_history:
-        stats = []
-        for i in account_ids:
-            stats += hero_stats_from_history(i, days)
+# ---- per team
+with tab_team:
+    if not df["team"].astype(str).str.strip().any():
+        st.info("Pick a Pros roster to see team breakdowns.")
     else:
-        try:
-            stats = hero_stats(account_ids, days)
-        except urllib.error.HTTPError as e:
-            print(f"hero-stats endpoint returned HTTP {e.code}; "
-                  f"falling back to match history")
-            stats = []
-            for i in account_ids:
-                stats += hero_stats_from_history(i, days)
+        for team in [t for t in df["team"].unique() if t]:
+            sub = df[df["team"] == team]
+            agg = (sub.groupby("hero", as_index=False)
+                      .agg(players=("account_id", "nunique"),
+                           matches=("matches", "sum"),
+                           wins=("wins", "sum")))
+            agg["win_rate"] = (agg["wins"] / agg["matches"] * 100).round(1)
+            agg = agg.sort_values("matches", ascending=False)
 
-    by_player = {}
-    for s in stats:
-        by_player.setdefault(s["account_id"], []).append(s)
+            wr = sub["wins"].sum() / sub["matches"].sum() * 100
+            st.subheader(f"{team} — {int(sub['matches'].sum())} matches, {wr:.1f}% win rate")
+            st.dataframe(
+                agg, hide_index=True, use_container_width=True,
+                column_config={
+                    "hero": "Hero",
+                    "players": st.column_config.NumberColumn("Players"),
+                    "matches": st.column_config.NumberColumn("Played"),
+                    "wins": st.column_config.NumberColumn("Wins"),
+                    "win_rate": WINRATE_COL,
+                },
+            )
 
-    rows = []
-    for account_id in account_ids:
-        info = get_rank(account_id)
-        played = sorted(by_player.get(account_id, []),
-                        key=lambda s: -s.get("matches_played", 0))
-        total = sum(s.get("matches_played", 0) for s in played)
-
-        print(f"\n{'=' * 58}")
-        print(f"  {account_id}   {info['rank_label']}"
-              f"   ({total} matches in the last {days} days)")
-        print(f"{'=' * 58}")
-
-        if not played:
-            print("  no matches in this window")
-            continue
-
-        print(f"  {'hero':<16}{'played':>8}{'wins':>7}{'win rate':>11}")
-        print(f"  {'-' * 42}")
-        for s in played[:top]:
-            n, w = s.get("matches_played", 0), s.get("wins", 0)
-            wr = (w / n * 100) if n else 0
-            hero = names.get(s["hero_id"], f"hero {s['hero_id']}")
-            print(f"  {hero:<16}{n:>8}{w:>7}{wr:>10.1f}%")
-            rows.append({
-                "account_id": account_id,
-                "rank": info["rank_label"],
-                "rank_num": info["rank"],
-                "subrank": info["subrank"],
-                "hero": hero,
-                "hero_id": s["hero_id"],
-                "matches": n,
-                "wins": w,
-                "win_rate": round(wr, 1),
-            })
-
-    if csv_path and rows:
-        import csv as _csv
-        with open(csv_path, "w", newline="", encoding="utf-8") as f:
-            writer = _csv.DictWriter(f, fieldnames=list(rows[0]))
-            writer.writeheader()
-            writer.writerows(rows)
-        print(f"\nwrote {len(rows)} rows to {csv_path}")
-
-    return rows
-
-
-# --------------------------------------------------------------- menu
-
-def ask(prompt, default=""):
-    try:
-        return input(prompt).strip() or default
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return None
-
-
-def menu():
-    ids, days, top = [], 30, 5
-
-    while True:
-        print(f"""
-============== DEADLOCK PLAYER REPORT ==============
-  1. Add players (ids or statlocker URLs)
-  2. Load ids from a file
-  3. Set time window        (now: last {days} days)
-  4. Set heroes shown       (now: top {top})
-  5. Run report
-  6. Run report + save CSV
-  7. Look up one rank
-  8. Clear player list
-  0. Quit
-
-  players: {', '.join(map(str, ids)) or '(none yet)'}""")
-
-        choice = ask("\n  choose: ")
-        if choice is None or choice == "0" or choice.lower() in ("q", "quit", "exit"):
-            print("  bye")
-            return
-
-        if choice == "1":
-            raw = ask("  paste ids or URLs (space or comma separated): ")
-            if raw:
-                found = parse_ids(raw.replace(",", " ").split())
-                ids = list(dict.fromkeys(ids + found))
-                print(f"  added {len(found)}; list is now {len(ids)}")
-
-        elif choice == "2":
-            path = ask("  file path: ")
-            if path and os.path.exists(path):
-                ids = list(dict.fromkeys(ids + read_id_file(path)))
-                print(f"  list is now {len(ids)}")
-            else:
-                print("  file not found")
-
-        elif choice == "3":
-            v = ask("  days to look back (default 30): ", "30")
-            days = int(v) if v and v.isdigit() else 30
-
-        elif choice == "4":
-            v = ask("  how many heroes per player (default 5): ", "5")
-            top = int(v) if v and v.isdigit() else 5
-
-        elif choice in ("5", "6"):
-            if not ids:
-                print("  add some players first")
-            else:
-                path = ask("  csv filename (default players.csv): ", "players.csv") \
-                    if choice == "6" else None
-                report(ids, days=days, top=top, csv_path=path)
-
-        elif choice == "7":
-            one = ask("  id or URL: ")
-            got = parse_ids([one]) if one else []
-            if got:
-                info = get_rank(got[0])
-                print(f"  {got[0]}: {info['rank_label']}   "
-                      f"(rank {info['rank']}, subrank {info['subrank']}, badge {info['badge']})")
-
-        elif choice == "8":
-            ids = []
-            print("  cleared")
-
-        else:
-            print("  pick a number from the menu.")
-
-        if ask("\n  [enter] to continue ") is None:
-            return
-
-
-# --------------------------------------------------------------- entry point
-
-if __name__ == "__main__":
-    args = sys.argv[1:]
-    if not args:
-        menu()
-        sys.exit()
-
-    days = int(args[args.index("--days") + 1]) if "--days" in args else 30
-    top = int(args[args.index("--top") + 1]) if "--top" in args else 5
-    csv_path = args[args.index("--csv") + 1] if "--csv" in args else None
-
-    ids = []
-    if "--file" in args:
-        ids += read_id_file(args[args.index("--file") + 1])
-
-    flag_values = {"--days", "--top", "--csv", "--file"}
-    skip = set()
-    for f in flag_values:
-        if f in args:
-            skip.add(args.index(f) + 1)
-    ids += parse_ids([a for i, a in enumerate(args)
-                      if not a.startswith("--") and i not in skip])
-
-    if not ids:
-        print(__doc__)
-        sys.exit(1)
-
-    report(list(dict.fromkeys(ids)), days=days, top=top,
-           use_history="--history" in args, csv_path=csv_path)
+# ---- everything, downloadable
+with tab_data:
+    st.dataframe(df, hide_index=True, use_container_width=True)
+    safe = preset.replace(" ", "_").replace("—", "").lower()
+    st.download_button(
+        "Download CSV",
+        df.to_csv(index=False).encode("utf-8"),
+        file_name=f"deadlock_{safe}_{days}d.csv",
+        mime="text/csv",
+    )

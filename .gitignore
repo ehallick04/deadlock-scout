@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 heroes.json
+cache/
 *.csv
 ids.txt
 Ids.txt

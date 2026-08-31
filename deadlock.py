@@ -14,7 +14,7 @@ import time
 import urllib.error
 from collections import Counter
 
-from api import get_json, get_cached
+from api import cache_info, clear_cache, get_json, get_cached
 
 HEROES_FILE = "heroes.json"
 
@@ -287,6 +287,7 @@ def flatten(players):
          "ign": p.get("ign", ""),
          "team": p.get("team", ""),
          "region": p.get("region", ""),
+         "is_sub": p.get("is_sub", False),
          "persona_name": p.get("persona_name", ""),
          "rank": p["rank_label"],
          "rank_num": p["rank"], "subrank": p["subrank"], **h}
@@ -352,7 +353,8 @@ def shared_match_ids(by_player, min_players=4):
 
 
 def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
-                      labels=None, match_mode=CUSTOMS_ONLY):
+                      labels=None, match_mode=CUSTOMS_ONLY, include_subs=False,
+                      min_sub_games=1):
     """
     Same shape as build_report, but restricted to matches where at least
     `min_players` of this roster were in the same game.
@@ -369,10 +371,29 @@ def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
     by_player = custom_match_ids(account_ids, days, match_mode)
     shared, counts = shared_match_ids(by_player, min_players)
 
+    # who stood in?
+    subs, participants = {}, {}
+    report_ids = list(account_ids)
+    if include_subs and shared:
+        participants = match_participants(shared)
+        subs = find_subs(participants, account_ids, min_sub_games)
+
+        team_label = next((labels[i]["team"] for i in account_ids
+                           if labels.get(i, {}).get("team")), "")
+        region = next((labels[i]["region"] for i in account_ids
+                       if labels.get(i, {}).get("region")), "")
+        labels = dict(labels)
+        for aid, row in sorted(subs.items(), key=lambda kv: -kv[1]["games"]):
+            report_ids.append(aid)
+            labels[aid] = {"ign": "", "team": f"{team_label} (sub)".strip(),
+                           "region": region}
+            by_player[aid] = row["with"]
+
+    profiles = steam_profiles(report_ids)
     since = int(time.time()) - days * 86400
     players = []
 
-    for account_id in account_ids:
+    for account_id in report_ids:
         own_customs = by_player.get(account_id, set())
         own_shared = own_customs & shared
 
@@ -410,11 +431,13 @@ def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
 
         info = get_rank(account_id)
         label = labels.get(account_id, {})
+        is_sub = account_id in subs
         players.append({
             "account_id": account_id,
-            "ign": label.get("ign", ""),
+            "ign": label.get("ign", "") or ("sub" if is_sub else ""),
             "team": label.get("team", ""),
             "region": label.get("region", ""),
+            "is_sub": is_sub,
             "persona_name": profiles.get(account_id, {}).get("personaname", ""),
             "rank_label": info["rank_label"],
             "rank": info["rank"],
@@ -430,5 +453,93 @@ def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
         "shared_matches": len(shared),
         "min_players": min_players,
         "stack_sizes": dict(sorted(Counter(counts.values()).items(), reverse=True)),
+        "subs": {aid: row["games"] for aid, row in subs.items()},
+        "matches_inspected": len(participants),
     }
     return players, meta
+
+
+# =====================================================================
+# Substitutes: who filled in when a roster player was missing
+# =====================================================================
+#
+# A custom lobby has two teams. Every player on the OTHER team is also
+# "not on the roster", so we cannot just call every unknown account a
+# sub. For each match we work out which side most roster members are on,
+# then anyone else on THAT side is a stand-in.
+
+def _walk_dicts(node):
+    """Yield every dict nested anywhere inside a JSON structure."""
+    if isinstance(node, dict):
+        yield node
+        for v in node.values():
+            yield from _walk_dicts(v)
+    elif isinstance(node, list):
+        for v in node:
+            yield from _walk_dicts(v)
+
+
+def match_participants(match_ids, limit=60, pause=0.05):
+    """
+    -> {match_id: {account_id: {"hero_id": int|None, "team": int|None}}}
+
+    Reads /v1/matches/{id}/metadata. The extractor walks the JSON looking
+    for any object carrying an account_id, so it survives changes to the
+    surrounding shape.
+    """
+    ids = list(match_ids)[:limit]
+    if len(match_ids) > limit:
+        print(f"  (only inspecting the first {limit} of {len(match_ids)} matches)")
+
+    out = {}
+    for mid in ids:
+        try:
+            md = get_json(f"/v1/matches/{mid}/metadata", disable_steam="true")
+        except urllib.error.HTTPError:
+            continue
+
+        players = {}
+        for node in _walk_dicts(md):
+            aid = node.get("account_id")
+            if isinstance(aid, int) and aid > 0:
+                players[aid] = {
+                    "hero_id": node.get("hero_id"),
+                    "team": node.get("team", node.get("player_team")),
+                }
+        if players:
+            out[mid] = players
+        time.sleep(pause)
+    return out
+
+
+def find_subs(participants, roster_ids, min_games=1):
+    """
+    Non-roster players who appeared ON THE ROSTER'S SIDE.
+    -> {account_id: {"games": n, "with": set(match_ids)}}
+    """
+    roster_ids = set(roster_ids)
+    found = {}
+
+    for mid, players in participants.items():
+        # group the lobby by side
+        sides = {}
+        for aid, info in players.items():
+            sides.setdefault(info.get("team"), []).append(aid)
+
+        if len(sides) < 2:
+            continue    # no usable team field; skip rather than guess
+
+        # the side holding the most roster members is "their" side
+        our_side = max(sides,
+                       key=lambda t: sum(1 for a in sides[t] if a in roster_ids))
+        if not any(a in roster_ids for a in sides[our_side]):
+            continue
+
+        for aid in sides[our_side]:
+            if aid in roster_ids:
+                continue
+            row = found.setdefault(aid, {"games": 0, "with": set()})
+            row["games"] += 1
+            row["with"].add(mid)
+
+    return {aid: row for aid, row in found.items() if row["games"] >= min_games}

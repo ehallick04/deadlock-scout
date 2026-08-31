@@ -10,6 +10,7 @@ data and formats it. No HTTP and no game logic lives here.
     python main.py --file ids.txt --days 30 --top 5 --csv players.csv
     python main.py --pros All                      # customs where 4+ teammates played together
     python main.py --pros Leviathan --together 5   # stricter: 5+ of the roster
+    python main.py --pros Leviathan --subs         # also report stand-ins
     python main.py --pros Leviathan --solo         # all their customs, no grouping
     python main.py --pros NA --days 14
     python main.py --pros Leviathan --days 30
@@ -18,6 +19,11 @@ data and formats it. No HTTP and no game logic lives here.
     python main.py 880934744 --mode private_lobby  # custom games only
     python main.py 880934744 --game-mode street_brawl
     python main.py 880934744 --history             # cross-check via match history
+    python main.py --pros NA --refresh             # ignore the cache, pull live
+    python main.py --clear-cache                   # empty cache/ and exit
+
+Responses are cached in cache/ and reused: assets for 7 days, finished match
+metadata for a year, steam names for a day, ranks and hero stats for 6 hours.
 
 Defaults: game_mode=normal, match_mode=ranked,unranked
 (customs, bot games and tutorials are excluded)
@@ -26,6 +32,8 @@ Defaults: game_mode=normal, match_mode=ranked,unranked
 import csv
 import os
 import sys
+
+from api import cache_info, clear_cache
 
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
@@ -91,10 +99,12 @@ def run(ids, days=DEFAULT_DAYS, top=5, use_history=False, csv_path=None,
     return players
 
 
-def run_team(ids, days, top, min_players, labels, csv_path=None):
+def run_team(ids, days, top, min_players, labels, csv_path=None,
+             include_subs=False):
     """Only matches where the roster played together."""
     players, meta = build_team_report(ids, days=days, top=top,
-                                      min_players=min_players, labels=labels)
+                                      min_players=min_players, labels=labels,
+                                      include_subs=include_subs)
 
     print(f"\n{'=' * 58}")
     print(f"  TEAM GAMES ONLY — at least {min_players} roster members per match")
@@ -103,12 +113,18 @@ def run_team(ids, days, top, min_players, labels, csv_path=None):
         sizes = "  ".join(f"{n} players: {c} matches"
                           for n, c in meta["stack_sizes"].items())
         print(f"  stack sizes across all their customs -> {sizes}")
+    if meta.get("subs"):
+        print(f"  {len(meta['subs'])} stand-in(s) found across "
+              f"{meta['matches_inspected']} inspected matches")
     print(f"{'=' * 58}")
 
     for p in players:
-        who = p.get("ign") or p.get("persona_name") or str(p["account_id"])
+        who = p.get("persona_name") or str(p["account_id"])
+        if p.get("ign") and p["ign"] != "sub":
+            who = p["ign"]
+        tag = "  *SUB*" if p.get("is_sub") else ""
         team = f"  ({p['team']})" if p.get("team") else ""
-        print(f"\n  {who}{team}   [{p['account_id']}]   {p['rank_label']}")
+        print(f"\n  {who}{team}{tag}   [{p['account_id']}]   {p['rank_label']}")
         print(f"  {p['team_matches']} team games of {p['custom_matches']} customs")
         if not p["heroes"]:
             print("    no qualifying matches")
@@ -233,10 +249,12 @@ def pros_menu(days, top):
     tg = ask("  only games where they played TOGETHER? (Y/n): ", "y")
     together = not tg.lower().startswith("n")
 
-    min_players = 4
+    min_players, include_subs = 4, False
     if together:
         v = ask("  minimum roster members per match (blank = 4): ", "4")
         min_players = int(v) if v and v.isdigit() else 4
+        sb = ask("  include stand-ins / subs? (y/N): ", "n")
+        include_subs = sb.lower().startswith("y")
 
     safe = selection.replace(" ", "_").lower()
     suffix = f"_together{min_players}" if together else ""
@@ -244,7 +262,8 @@ def pros_menu(days, top):
 
     print(f"\n  {selection}: {len(ids)} players, custom games, last {days} days")
     if together:
-        run_team(ids, days, top, min_players, labels, csv_path=path)
+        run_team(ids, days, top, min_players, labels, csv_path=path,
+                 include_subs=include_subs)
     else:
         run(ids, days=days, top=top, match_mode=CUSTOMS_ONLY,
             labels=labels, csv_path=path, show_totals=True)
@@ -271,6 +290,7 @@ def menu():
         print(f"""
 ============== DEADLOCK PLAYER REPORT ==============
   P. Pros  (preset team rosters, custom games)
+  C. Cache (status / clear)
   1. Add players (ids or statlocker URLs)
   2. Load ids from a file
   3. Set time window        (now: last {days} days)
@@ -292,6 +312,18 @@ def menu():
 
         if choice.lower() == "p":
             pros_menu(days, top)
+
+        elif choice.lower() == "c":
+            info = cache_info()
+            print(f"\n  {info['entries']} cached responses, "
+                  f"{info['megabytes']} MB, oldest {info['oldest_hours']}h old")
+            print("  fresh for: assets 7d · match metadata 1y · "
+                  "steam names 1d · everything else 6h")
+            what = ask("  clear it? (a=all, s=stale only, blank=keep): ")
+            if what and what.lower().startswith("a"):
+                print(f"  removed {clear_cache()} entries")
+            elif what and what.lower().startswith("s"):
+                print(f"  removed {clear_cache(older_than_hours=6)} entries")
 
         elif choice == "1":
             raw = ask("  paste ids or URLs (space or comma separated): ")
@@ -390,6 +422,15 @@ def parse_args(args):
 if __name__ == "__main__":
     args = sys.argv[1:]
 
+    if "--clear-cache" in args:
+        print(f"removed {clear_cache()} cached responses")
+        sys.exit()
+
+    if "--refresh" in args:
+        # skip the cache for this run by expiring everything first
+        print(f"cleared {clear_cache()} cached responses (forcing live data)")
+        args = [a for a in args if a != "--refresh"]
+
     if not args:
         menu()
         sys.exit()
@@ -408,7 +449,8 @@ if __name__ == "__main__":
         else:
             n = int(args[args.index("--together") + 1]) if "--together" in args else 4
             run_team(ids, days, top, n, labels,
-                     csv_path=f"pros_{safe}_{days}d_together{n}.csv")
+                     csv_path=f"pros_{safe}_{days}d_together{n}.csv",
+                     include_subs="--subs" in args)
         sys.exit()
 
     ids, days, top, csv_path, match_mode, game_mode = parse_args(args)

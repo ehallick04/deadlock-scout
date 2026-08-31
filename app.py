@@ -14,6 +14,7 @@ Deploy free: push this folder to GitHub, then connect it at share.streamlit.io
 import pandas as pd
 import streamlit as st
 
+from api import cache_info, clear_cache
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
     WITH_CUSTOMS, build_report, build_team_report, flatten, hero_totals,
@@ -48,11 +49,12 @@ def load(ids_tuple, days, top, match_mode, game_mode, labels_tuple):
 
 
 @st.cache_data(ttl=900, show_spinner=False)
-def load_team(ids_tuple, days, top, min_players, labels_tuple):
+def load_team(ids_tuple, days, top, min_players, labels_tuple, include_subs):
     """Only matches where several of the roster were in the same game."""
     labels = {k: dict(v) for k, v in labels_tuple}
     return build_team_report(list(ids_tuple), days=days, top=top,
-                             min_players=min_players, labels=labels)
+                             min_players=min_players, labels=labels,
+                             include_subs=include_subs)
 
 
 def whole_number(text, fallback, label, minimum=1, maximum=3650):
@@ -120,8 +122,28 @@ if together:
     min_players = whole_number(
         st.sidebar.text_input("Minimum players per match", value="4"),
         4, "Minimum players", minimum=2, maximum=12)
+    include_subs = st.sidebar.checkbox(
+        "Find stand-ins",
+        value=False,
+        help="Reads each match's lineup to spot players who filled in on "
+             "the roster's side. Costs one request per match, so it is "
+             "slower.",
+    )
+else:
+    include_subs = False
 
 run = st.sidebar.button("Build report", type="primary", use_container_width=True)
+
+with st.sidebar.expander("Cache"):
+    info = cache_info()
+    st.caption(f"{info['entries']} cached responses · {info['megabytes']} MB · "
+               f"oldest {info['oldest_hours']}h")
+    st.caption("Fresh for: assets 7d · match metadata 1y · "
+               "steam names 1d · ranks and stats 6h")
+    if st.button("Clear cache", use_container_width=True):
+        removed = clear_cache()
+        st.cache_data.clear()
+        st.success(f"Removed {removed} entries. Rebuild to pull live data.")
 
 
 # --------------------------------------------------------------- main
@@ -143,7 +165,7 @@ if run:
         try:
             if together:
                 players, meta = load_team(tuple(ids), days, top,
-                                          min_players, label_key)
+                                          min_players, label_key, include_subs)
             else:
                 players, meta = load(tuple(ids), days, top, match_mode,
                                      game_mode, label_key)
@@ -175,6 +197,9 @@ c4.metric("Overall win rate",
           f"{df['wins'].sum() / df['matches'].sum() * 100:.1f}%")
 
 if meta:
+    if meta.get("subs"):
+        st.warning(f"**{len(meta['subs'])} stand-in(s)** detected across "
+                   f"{meta['matches_inspected']} matches — shown with a SUB tag.")
     st.info(f"**Team games only** — {meta['shared_matches']} matches with at "
             f"least {meta['min_players']} of the selected players. "
             f"Stack sizes across all their customs: "
@@ -205,7 +230,11 @@ with tab_hero:
 # ---- per player
 with tab_player:
     for p in players:
-        who = p.get("ign") or p.get("persona_name") or f"Account {p['account_id']}"
+        who = p.get("persona_name") or f"Account {p['account_id']}"
+        if p.get("ign") and p["ign"] != "sub":
+            who = p["ign"]
+        if p.get("is_sub"):
+            who = f"{who}  ⟨SUB⟩"
         team = f" · {p['team']}" if p.get("team") else ""
         extra = (f" ({p['team_matches']} of {p['custom_matches']} customs)"
                  if "team_matches" in p else "")
