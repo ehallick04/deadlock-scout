@@ -16,7 +16,8 @@ import streamlit as st
 
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
-    WITH_CUSTOMS, build_report, flatten, hero_totals, parse_ids,
+    WITH_CUSTOMS, build_report, build_team_report, flatten, hero_totals,
+    parse_ids,
 )
 from teams import TEAMS, choices, roster
 
@@ -43,7 +44,15 @@ def load(ids_tuple, days, top, match_mode, game_mode, labels_tuple):
     labels = {k: dict(v) for k, v in labels_tuple}
     return build_report(list(ids_tuple), days=days, top=top,
                         match_mode=match_mode, game_mode=game_mode,
-                        labels=labels)
+                        labels=labels), None
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def load_team(ids_tuple, days, top, min_players, labels_tuple):
+    """Only matches where several of the roster were in the same game."""
+    labels = {k: dict(v) for k, v in labels_tuple}
+    return build_team_report(list(ids_tuple), days=days, top=top,
+                             min_players=min_players, labels=labels)
 
 
 def whole_number(text, fallback, label, minimum=1, maximum=3650):
@@ -100,6 +109,18 @@ match_mode = st.sidebar.selectbox(
     "Match mode", MATCH_MODES, index=MATCH_MODES.index(default_mode))
 game_mode = st.sidebar.selectbox("Game mode", ["normal", "street_brawl"], index=0)
 
+together = st.sidebar.checkbox(
+    "Only games they played together",
+    value=(preset != CUSTOM_ENTRY),
+    help="Keeps only matches containing several of the selected players, "
+         "so pugs and inhouses with strangers drop out. Custom lobbies only.",
+)
+min_players = 4
+if together:
+    min_players = whole_number(
+        st.sidebar.text_input("Minimum players per match", value="4"),
+        4, "Minimum players", minimum=2, maximum=12)
+
 run = st.sidebar.button("Build report", type="primary", use_container_width=True)
 
 
@@ -116,12 +137,18 @@ st.write(f"**{preset}** · {len(ids)} player(s) · last {days} days · "
          f"`{match_mode}` · `{game_mode}`")
 
 if run:
+    label_key = tuple(sorted((k, tuple(sorted(v.items())))
+                             for k, v in labels.items()))
     with st.spinner(f"Pulling data for {len(ids)} player(s)..."):
         try:
-            st.session_state.players = load(
-                tuple(ids), days, top, match_mode, game_mode,
-                tuple(sorted((k, tuple(sorted(v.items()))) for k, v in labels.items())),
-            )
+            if together:
+                players, meta = load_team(tuple(ids), days, top,
+                                          min_players, label_key)
+            else:
+                players, meta = load(tuple(ids), days, top, match_mode,
+                                     game_mode, label_key)
+            st.session_state.players = players
+            st.session_state.meta = meta
         except Exception as e:
             st.error(f"Could not reach the Deadlock API: {e}")
             st.stop()
@@ -130,6 +157,7 @@ if "players" not in st.session_state:
     st.stop()
 
 players = st.session_state.players
+meta = st.session_state.get("meta")
 rows = flatten(players)
 
 if not rows:
@@ -145,6 +173,13 @@ c2.metric("Matches", int(df["matches"].sum()))
 c3.metric("Distinct heroes", df["hero"].nunique())
 c4.metric("Overall win rate",
           f"{df['wins'].sum() / df['matches'].sum() * 100:.1f}%")
+
+if meta:
+    st.info(f"**Team games only** — {meta['shared_matches']} matches with at "
+            f"least {meta['min_players']} of the selected players. "
+            f"Stack sizes across all their customs: "
+            + ", ".join(f"{n} players in {c} matches"
+                        for n, c in meta["stack_sizes"].items()))
 
 WINRATE_COL = st.column_config.ProgressColumn(
     "Win rate", format="%.1f%%", min_value=0, max_value=100)
@@ -172,7 +207,10 @@ with tab_player:
     for p in players:
         who = p.get("ign") or p.get("persona_name") or f"Account {p['account_id']}"
         team = f" · {p['team']}" if p.get("team") else ""
-        header = f"**{who}**{team} — {p['rank_label']} · {p['total_matches']} matches"
+        extra = (f" ({p['team_matches']} of {p['custom_matches']} customs)"
+                 if "team_matches" in p else "")
+        header = (f"**{who}**{team} — {p['rank_label']} · "
+                  f"{p['total_matches']} matches{extra}")
         with st.expander(header, expanded=len(players) <= 6):
             if not p["heroes"]:
                 st.write("No matches in this window.")

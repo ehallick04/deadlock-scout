@@ -12,6 +12,7 @@ import os
 import re
 import time
 import urllib.error
+from collections import Counter
 
 from api import get_json, get_cached
 
@@ -318,3 +319,116 @@ def hero_totals(players):
             if row["matches"] else 0.0,
         })
     return sorted(out, key=lambda r: -r["matches"])
+
+
+# =====================================================================
+# Team games: matches where a roster actually played TOGETHER
+# =====================================================================
+#
+# /v1/players/hero-stats returns a `matches` list of match ids alongside
+# each hero row. Collect those per player, count how many roster members
+# appear in each match id, and keep only the ids that several of them
+# share. Those are the games the team played together, as opposed to pugs
+# and inhouses with strangers.
+
+def custom_match_ids(account_ids, days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY):
+    """-> {account_id: set(match_id)} for the window."""
+    stats = hero_stats(account_ids, days, match_mode=match_mode)
+    out = {}
+    for s in stats:
+        out.setdefault(s["account_id"], set()).update(s.get("matches") or [])
+    return out
+
+
+def shared_match_ids(by_player, min_players=4):
+    """
+    -> (set of match ids with at least min_players roster members,
+        Counter of match_id -> how many roster members were in it)
+    """
+    counts = Counter()
+    for ids in by_player.values():
+        counts.update(ids)
+    return {mid for mid, n in counts.items() if n >= min_players}, counts
+
+
+def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
+                      labels=None, match_mode=CUSTOMS_ONLY):
+    """
+    Same shape as build_report, but restricted to matches where at least
+    `min_players` of this roster were in the same game.
+
+    Costs one batched hero-stats call plus one match-history call per
+    player (100 req/s, so cheap). match-history is what supplies the
+    per-match hero and win/loss; hero-stats supplies the authoritative
+    set of custom match ids.
+    """
+    labels = labels or {}
+    names = hero_names()
+    profiles = steam_profiles(account_ids)
+
+    by_player = custom_match_ids(account_ids, days, match_mode)
+    shared, counts = shared_match_ids(by_player, min_players)
+
+    since = int(time.time()) - days * 86400
+    players = []
+
+    for account_id in account_ids:
+        own_customs = by_player.get(account_id, set())
+        own_shared = own_customs & shared
+
+        tally = {}
+        if own_shared:
+            try:
+                history = get_json(f"/v1/players/{account_id}/match-history")
+            except urllib.error.HTTPError:
+                history = []
+            for m in history:
+                if m.get("match_id") not in own_shared:
+                    continue
+                if m.get("start_time", 0) < since:
+                    continue
+                outcome = m.get("player_match_outcome")
+                if outcome not in (WIN, LOSS):
+                    continue
+                row = tally.setdefault(m["hero_id"], {"hero_id": m["hero_id"],
+                                                      "matches_played": 0,
+                                                      "wins": 0})
+                row["matches_played"] += 1
+                row["wins"] += 1 if outcome == WIN else 0
+
+        played = sorted(tally.values(), key=lambda r: -r["matches_played"])
+        hero_rows = []
+        for r in played[:top]:
+            n, w = r["matches_played"], r["wins"]
+            hero_rows.append({
+                "hero": names.get(r["hero_id"], f"hero {r['hero_id']}"),
+                "hero_id": r["hero_id"],
+                "matches": n,
+                "wins": w,
+                "win_rate": round(w / n * 100, 1) if n else 0.0,
+            })
+
+        info = get_rank(account_id)
+        label = labels.get(account_id, {})
+        players.append({
+            "account_id": account_id,
+            "ign": label.get("ign", ""),
+            "team": label.get("team", ""),
+            "region": label.get("region", ""),
+            "persona_name": profiles.get(account_id, {}).get("personaname", ""),
+            "rank_label": info["rank_label"],
+            "rank": info["rank"],
+            "subrank": info["subrank"],
+            "badge": info["badge"],
+            "total_matches": sum(r["matches_played"] for r in played),
+            "custom_matches": len(own_customs),
+            "team_matches": len(own_shared),
+            "heroes": hero_rows,
+        })
+
+    meta = {
+        "shared_matches": len(shared),
+        "min_players": min_players,
+        "stack_sizes": dict(sorted(Counter(counts.values()).items(), reverse=True)),
+    }
+    return players, meta
