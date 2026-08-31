@@ -21,7 +21,9 @@ touches the network. How long each kind of data stays fresh:
 Pass refresh=True to force a live fetch, or call clear_cache().
 """
 
+import gzip
 import hashlib
+import io
 import json
 import os
 import time
@@ -115,6 +117,107 @@ def cache_info():
         "megabytes": round(size / 1_048_576, 2),
         "oldest_hours": round((time.time() - oldest) / 3600, 1),
     }
+
+
+# Endpoints whose answers never change. A bundle of these stays valid
+# forever, which is what makes exporting worthwhile.
+PERMANENT_FRAGMENTS = ("/v1/assets/", "/metadata")
+
+
+def is_permanent(url):
+    return any(f in url for f in PERMANENT_FRAGMENTS)
+
+
+def export_cache(only_permanent=False, max_entry_mb=None):
+    """
+    Bundle the cache into one gzipped JSON blob you can save and re-import
+    later - after a Streamlit Cloud restart, for instance, which wipes the
+    container's disk.
+
+    only_permanent  keep just the data that never goes stale (assets and
+                    finished match metadata). Smaller, and never wasted.
+    max_entry_mb    skip individual responses bigger than this.
+
+    -> (bytes, {"entries": n, "megabytes": x, "skipped": n})
+    """
+    entries, skipped = [], 0
+    if os.path.isdir(CACHE_DIR):
+        for name in sorted(os.listdir(CACHE_DIR)):
+            if not name.endswith(".json"):
+                continue
+            path = os.path.join(CACHE_DIR, name)
+            try:
+                with open(path, encoding="utf-8") as f:
+                    entry = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                skipped += 1
+                continue
+
+            url = entry.get("url", "")
+            if only_permanent and not is_permanent(url):
+                skipped += 1
+                continue
+            if max_entry_mb and os.path.getsize(path) > max_entry_mb * 1_048_576:
+                skipped += 1
+                continue
+            entries.append(entry)
+
+    payload = {"format": "deadlock-cache/1", "exported": time.time(),
+               "entries": entries}
+    buf = io.BytesIO()
+    with gzip.GzipFile(fileobj=buf, mode="wb") as gz:
+        gz.write(json.dumps(payload).encode("utf-8"))
+    blob = buf.getvalue()
+
+    return blob, {"entries": len(entries), "skipped": skipped,
+                  "megabytes": round(len(blob) / 1_048_576, 2)}
+
+
+def import_cache(blob, overwrite=False):
+    """
+    Restore a bundle produced by export_cache. Accepts bytes or a path.
+    Entries already past their time-to-live are skipped, so importing an
+    old bundle cannot resurrect stale player stats - but permanent data
+    (assets, match metadata) always comes through.
+
+    -> {"added": n, "skipped_stale": n, "skipped_existing": n}
+    """
+    if isinstance(blob, str):
+        with open(blob, "rb") as f:
+            blob = f.read()
+
+    with gzip.GzipFile(fileobj=io.BytesIO(blob), mode="rb") as gz:
+        payload = json.loads(gz.read().decode("utf-8"))
+
+    if payload.get("format") != "deadlock-cache/1":
+        raise ValueError("not a deadlock cache bundle")
+
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    added = stale = existing = 0
+
+    for entry in payload.get("entries", []):
+        url = entry.get("url")
+        if not url:
+            continue
+
+        age = time.time() - entry.get("fetched", 0)
+        if not is_permanent(url) and age > ttl_for(url):
+            stale += 1
+            continue
+
+        path = _cache_file(url)
+        if os.path.exists(path) and not overwrite:
+            existing += 1
+            continue
+
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(entry, f)
+            added += 1
+        except OSError:
+            pass
+
+    return {"added": added, "skipped_stale": stale, "skipped_existing": existing}
 
 
 def clear_cache(older_than_hours=None):
