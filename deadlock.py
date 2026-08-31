@@ -356,13 +356,15 @@ def shared_match_ids(by_player, min_players=4):
 
 
 def _team_block(members, team_label, region, days, top, min_players,
-                match_mode, include_subs, min_sub_games, by_player, names):
+                match_mode, include_subs, min_sub_games, by_player, names,
+                labels=None):
     """
     One team's report. `members` are that team's roster ids ONLY, so a pro
     from another team who stands in here is correctly seen as an outsider.
     """
     from teams import find_player
 
+    labels = labels or {}
     own = {aid: by_player.get(aid, set()) for aid in members}
     shared, counts = shared_match_ids(own, min_players)
 
@@ -425,12 +427,20 @@ def _team_block(members, team_label, region, days, top, min_players,
 
         info = get_rank(account_id)
         meta = sub_meta.get(account_id, {})
+
+        # Roster name first (teams.py), then anything passed in labels,
+        # and only fall back to the Steam persona if we know neither.
+        home = find_player(account_id)
+        ign = (labels.get(account_id, {}).get("ign")
+               or meta.get("ign")
+               or (home["ign"] if home else ""))
+
         players.append({
             "account_id": account_id,
             # a player can appear once per team context, so identity is the
             # PAIR of account and team - not the account alone
             "row_key": f"{account_id}@{team_label}" + ("+sub" if is_sub else ""),
-            "ign": meta.get("ign", ""),
+            "ign": ign,
             "team": f"{team_label} (sub)" if is_sub else team_label,
             "sub_for": team_label if is_sub else "",
             "home_team": meta.get("home_team", "") if is_sub else team_label,
@@ -480,7 +490,7 @@ def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
                        if labels.get(a)), "")
         players, shared, counts, subs, n = _team_block(
             members, team_label, region, days, top, min_players, match_mode,
-            include_subs, min_sub_games, by_player, names)
+            include_subs, min_sub_games, by_player, names, labels)
 
         all_players += players
         all_shared |= shared
