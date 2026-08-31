@@ -1,0 +1,4244 @@
+{
+  "generated": "2026-08-31T16:36:18",
+  "source": "C:\\Users\\Ethan Hallick\\DEADLOCK PROJECT\\dse_rosters.html",
+  "teams": {
+    "6 Rats in a Trench Coat": {
+      "team_id": 359,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "l1tty58": 192996911,
+        ".dwy": 137272887,
+        "icy.you": 165793749,
+        "thebaronyo": 201976925,
+        "themangoninja8": 1144538646,
+        "wujufella": 849819307,
+        "garebears_": 162081352,
+        "stuar.": 1515360595
+      },
+      "roles": {
+        "l1tty58": "POC",
+        ".dwy": "Core",
+        "icy.you": "Core",
+        "thebaronyo": "Core",
+        "themangoninja8": "Core",
+        "wujufella": "Core",
+        "garebears_": "Sub",
+        "stuar.": "Sub"
+      }
+    },
+    "6 Rems in a trench coat": {
+      "team_id": 298,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "asc3747": 901131097,
+        "amoursavan": 154954948,
+        "arkinoid99": 312364365,
+        "backyardigans": 1113392091,
+        "chech1171": 97260663,
+        "ciadefender": 296126449,
+        "holyhellhelpme": 173585739
+      },
+      "roles": {
+        "asc3747": "POC",
+        "amoursavan": "Core",
+        "arkinoid99": "Core",
+        "backyardigans": "Core",
+        "chech1171": "Core",
+        "ciadefender": "Core",
+        "holyhellhelpme": "Sub"
+      }
+    },
+    "A F F L I C T I O N": {
+      "team_id": 259,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "puffses": 370555201,
+        "cs.surf": 250306753,
+        "emollient": 210071973,
+        "p0kasokas": 331199452,
+        "plusonedex": 119157154,
+        "strawberry.timarisu": 346327241
+      },
+      "roles": {
+        "puffses": "POC",
+        "cs.surf": "Core",
+        "emollient": "Core",
+        "p0kasokas": "Core",
+        "plusonedex": "Core",
+        "strawberry.timarisu": "Core"
+      }
+    },
+    "Always Bet On Losing Horses": {
+      "team_id": 199,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "fooncy": 127339570,
+        "super727": 104030097,
+        "th3pandatank": 93241258,
+        "tinymou": 187986662,
+        "yeeko1013": 294905783,
+        "zerawasheree": 1860115091,
+        "_dargon_": 179430569,
+        "jeriichoa": 311965653
+      },
+      "roles": {
+        "fooncy": "POC",
+        "super727": "Core",
+        "th3pandatank": "Core",
+        "tinymou": "Core",
+        "yeeko1013": "Core",
+        "zerawasheree": "Core",
+        "_dargon_": "Sub",
+        "jeriichoa": "Sub"
+      }
+    },
+    "Backstabbers": {
+      "team_id": 400,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "sombrenha": 351358732,
+        "bacas__": 1049109681,
+        "cartoonpk": 81531564,
+        "dipano": 1752458011,
+        "lhs0001": 1042385647,
+        "sniperxxcsgoxx": 445350335
+      },
+      "roles": {
+        "sombrenha": "POC",
+        "bacas__": "Core",
+        "cartoonpk": "Core",
+        "dipano": "Core",
+        "lhs0001": "Core",
+        "sniperxxcsgoxx": "Core"
+      }
+    },
+    "Bandit Protocol": {
+      "team_id": 344,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "giantcavespider": 149564339,
+        "anarchy0193": 183768834,
+        "conv1ctedfel0n": 832932060,
+        "kingfishow": 289719718,
+        "valenlord": 122983399,
+        "vinsterplays": 372008663,
+        "chapped_cheeks": 804226419,
+        "imabsurd.": 1060688050
+      },
+      "roles": {
+        "giantcavespider": "POC",
+        "anarchy0193": "Core",
+        "conv1ctedfel0n": "Core",
+        "kingfishow": "Core",
+        "valenlord": "Core",
+        "vinsterplays": "Core",
+        "chapped_cheeks": "Sub",
+        "imabsurd.": "Sub"
+      }
+    },
+    "Baroness Ballers": {
+      "team_id": 146,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "tomciv": 402041259,
+        "definitelyfriendly": 208758846,
+        "hyper.nut": 454783110,
+        "juud42": 874122253,
+        "lethalpilot": 483631874,
+        "ren_sega": 1120613812,
+        "bluecrims0n": 887181058,
+        "schue_": 916068234
+      },
+      "roles": {
+        "tomciv": "POC",
+        "definitelyfriendly": "Core",
+        "hyper.nut": "Core",
+        "juud42": "Core",
+        "lethalpilot": "Core",
+        "ren_sega": "Core",
+        "bluecrims0n": "Sub",
+        "schue_": "Sub"
+      }
+    },
+    "Bear Pit": {
+      "team_id": 377,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "jacob_lashh": 999317148,
+        "0rigami1": 252655988,
+        "aldergustus": 194798052,
+        "nobodiishere_81531": 1217079401,
+        "qartier": 1096759033,
+        "senor_mountain": 878416072
+      },
+      "roles": {
+        "jacob_lashh": "POC",
+        "0rigami1": "Core",
+        "aldergustus": "Core",
+        "nobodiishere_81531": "Core",
+        "qartier": "Core",
+        "senor_mountain": "Core"
+      }
+    },
+    "Belly Slappers": {
+      "team_id": 408,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "wheat._.": 293793445,
+        "mothmanproper": 85889883,
+        "paulblart._.": 123645622,
+        "siratlas.": 159193809,
+        "taycoinc": 1060505665,
+        "tink4002": 192282170,
+        "eldritch_pig": 36082492,
+        "evoldarwin": 108938256
+      },
+      "roles": {
+        "wheat._.": "POC",
+        "mothmanproper": "Core",
+        "paulblart._.": "Core",
+        "siratlas.": "Core",
+        "taycoinc": "Core",
+        "tink4002": "Core",
+        "eldritch_pig": "Sub",
+        "evoldarwin": "Sub"
+      }
+    },
+    "Berzerkers": {
+      "team_id": 467,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "xavier911": 279474476,
+        "angadxo": 1154764617,
+        "astr4hh": 1056157749,
+        "doger1225": 367096583,
+        "hudinid": 307281036,
+        "typicalasian": 223375239
+      },
+      "roles": {
+        "xavier911": "POC",
+        "angadxo": "Core",
+        "astr4hh": "Core",
+        "doger1225": "Core",
+        "hudinid": "Core",
+        "typicalasian": "Core"
+      }
+    },
+    "Berzerkers Academy": {
+      "team_id": 454,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "phos.wav": 330743768,
+        "4547.": 325239722,
+        "autotelicplayer": 386406515,
+        "burntbacon_": 1011905059,
+        "finkledork7": 1122583263,
+        ".luucas.": 1264774362,
+        "scholarfps": 1855668965
+      },
+      "roles": {
+        "phos.wav": "POC",
+        "4547.": "Core",
+        "autotelicplayer": "Core",
+        "burntbacon_": "Core",
+        "finkledork7": "Core",
+        ".luucas.": "Core",
+        "scholarfps": "Sub"
+      }
+    },
+    "Best Friends by The Third Act": {
+      "team_id": 248,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "blahbers": 904593081,
+        "cactusstabus": 52421546,
+        "class6ix": 1638796439,
+        "redonifargell": 356404753,
+        "squiy_": 188214406,
+        "zekesentin": 302234395,
+        "fenixlink": 1051900432,
+        "hipno": 1132689437
+      },
+      "roles": {
+        "blahbers": "POC",
+        "cactusstabus": "Core",
+        "class6ix": "Core",
+        "redonifargell": "Core",
+        "squiy_": "Core",
+        "zekesentin": "Core",
+        "fenixlink": "Sub",
+        "hipno": "Sub"
+      }
+    },
+    "Big Pimpy": {
+      "team_id": 368,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "seanlumbo": 315921314,
+        "didulaw": 131489312,
+        "mstoxic": 195195036,
+        "sixtf": 97465323,
+        "snaggletooth72": 1124272208,
+        "tsuraggy": 376052666
+      },
+      "roles": {
+        "seanlumbo": "POC",
+        "didulaw": "Core",
+        "mstoxic": "Core",
+        "sixtf": "Core",
+        "snaggletooth72": "Core",
+        "tsuraggy": "Sub"
+      }
+    },
+    "Billys Blasted Coffee": {
+      "team_id": 258,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "bangather": 13921595,
+        "bep.py": 395033996,
+        "chocymelk": 106502546,
+        "drxre": 250226231,
+        ".juuice": 1478654657,
+        "razzledazzle888": 126239844,
+        "_oganesson": 235799583,
+        "strixspe": 90328083
+      },
+      "roles": {
+        "bangather": "POC",
+        "bep.py": "Core",
+        "chocymelk": "Core",
+        "drxre": "Core",
+        ".juuice": "Core",
+        "razzledazzle888": "Core",
+        "_oganesson": "Sub",
+        "strixspe": "Sub"
+      }
+    },
+    "Blessed By Nashala": {
+      "team_id": 300,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "lucid928": 308325175,
+        "kirachune": 210023401,
+        "ottersrules": 865649455,
+        "pixelxpixel": 84673780,
+        "schmoonie": 911886300,
+        "star_dragon": 868836949,
+        "uniqe._": 362449469,
+        "xanthe_": 376399322
+      },
+      "roles": {
+        "lucid928": "POC",
+        "kirachune": "Core",
+        "ottersrules": "Core",
+        "pixelxpixel": "Core",
+        "schmoonie": "Core",
+        "star_dragon": "Core",
+        "uniqe._": "Sub",
+        "xanthe_": "Sub"
+      }
+    },
+    "Blessed By Yoshi": {
+      "team_id": 435,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "zdvex": 73438366,
+        "dyson": 307572601,
+        "jules_spart": 1087179484,
+        "pra_da": 1495534631,
+        "wireless8150": 1535636631,
+        "molotyov": 1289345835
+      },
+      "roles": {
+        "zdvex": "POC",
+        "dyson": "Core",
+        "jules_spart": "Core",
+        "pra_da": "Core",
+        "wireless8150": "Core",
+        "molotyov": "Sub"
+      }
+    },
+    "Bosh Soldiers": {
+      "team_id": 428,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "kanga.": 1089886741,
+        "genevievevavance9787": 155829436,
+        "pure3111": 319387341,
+        "rnryan": 248196163,
+        "thesadfatkid": 1236843436
+      },
+      "roles": {
+        "kanga.": "POC",
+        "genevievevavance9787": "Core",
+        "pure3111": "Core",
+        "rnryan": "Core",
+        "thesadfatkid": "Core"
+      }
+    },
+    "Bridge 67": {
+      "team_id": 331,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "akiko2": 192497278,
+        "1pira": 418293680,
+        "blasphemusrage": 1117459701,
+        "bloosquish": 156146297,
+        "gammafission": 195547992,
+        "someguy396": 1121977429
+      },
+      "roles": {
+        "akiko2": "POC",
+        "1pira": "Core",
+        "blasphemusrage": "Core",
+        "bloosquish": "Core",
+        "gammafission": "Core",
+        "someguy396": "Core"
+      }
+    },
+    "Brooklyn Pigeons": {
+      "team_id": 429,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "nulfexjames": 877630159,
+        "dmpca": 2525888,
+        "__lad__": 897004528,
+        "mznarnia": 179812763,
+        "palss0n": 1026377874,
+        "rocketsodaa": 405384500,
+        ".tintin": 81726815
+      },
+      "roles": {
+        "nulfexjames": "POC",
+        "dmpca": "Core",
+        "__lad__": "Core",
+        "mznarnia": "Core",
+        "palss0n": "Core",
+        "rocketsodaa": "Core",
+        ".tintin": "Sub"
+      }
+    },
+    "Buff Reminders": {
+      "team_id": 265,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        ".brendark": 1246225257,
+        "abell55": 323752535,
+        "isaiaerz": 166579009,
+        "j0hn3605": 1143369344,
+        "keeger.": 343486759,
+        "le.krage": 1014074764,
+        "east1017": 841611084,
+        "lillsithss5200": 1053026124
+      },
+      "roles": {
+        ".brendark": "POC",
+        "abell55": "Core",
+        "isaiaerz": "Core",
+        "j0hn3605": "Core",
+        "keeger.": "Core",
+        "le.krage": "Core",
+        "east1017": "Sub",
+        "lillsithss5200": "Sub"
+      }
+    },
+    "Buhoundless Spirit": {
+      "team_id": 211,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "me_sushi": 1030495599,
+        "chikiaf": 1127527955,
+        "cloudryuji": 119990965,
+        "kusowari": 789650140,
+        "pinee.": 1234076113,
+        "seaclam": 129702856,
+        "kurc": 1162609430,
+        "notareal.doctor": 847439614
+      },
+      "roles": {
+        "me_sushi": "POC",
+        "chikiaf": "Core",
+        "cloudryuji": "Core",
+        "kusowari": "Core",
+        "pinee.": "Core",
+        "seaclam": "Core",
+        "kurc": "Sub",
+        "notareal.doctor": "Sub"
+      }
+    },
+    "Bye Bye": {
+      "team_id": 480,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "zcarlett": 1086413541,
+        "alkaline4774": 1134717659,
+        "dave_twt": 164544467,
+        "jin_ms": 315496399,
+        "jrbump": 43172291,
+        "swan_cleric": 1048992543
+      },
+      "roles": {
+        "zcarlett": "POC",
+        "alkaline4774": "Core",
+        "dave_twt": "Core",
+        "jin_ms": "Core",
+        "jrbump": "Core",
+        "swan_cleric": "Core"
+      }
+    },
+    "C2": {
+      "team_id": 59,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "cyragar": 25766064,
+        ".borealis.": 1008867720,
+        "creep4856": 1253016727,
+        "monet7790": 422389983,
+        "mrpizzapizza": 173610883,
+        "soapan": 472542839,
+        "dull_scissors": 41496181,
+        "feathers0": 896177127
+      },
+      "roles": {
+        "cyragar": "POC",
+        ".borealis.": "Core",
+        "creep4856": "Core",
+        "monet7790": "Core",
+        "mrpizzapizza": "Core",
+        "soapan": "Core",
+        "dull_scissors": "Sub",
+        "feathers0": "Sub"
+      }
+    },
+    "Came Short": {
+      "team_id": 433,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "isolat": 261829552,
+        "daloose": 205122413,
+        "dashxl": 353451770,
+        ".glean": 1128974725,
+        "hitony": 225644799,
+        "nwhoosh": 399159502,
+        "thatgreenpigeon": 192039141,
+        "wallsnolan": 247317936
+      },
+      "roles": {
+        "isolat": "POC",
+        "daloose": "Core",
+        "dashxl": "Core",
+        ".glean": "Core",
+        "hitony": "Core",
+        "nwhoosh": "Core",
+        "thatgreenpigeon": "Sub",
+        "wallsnolan": "Sub"
+      }
+    },
+    "CharmingChuds": {
+      "team_id": 455,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "charmingchari76": 991547214,
+        ".17250": 360012479,
+        "laquaviente": 1610605185,
+        "roxycotin": 127459494,
+        "the.dachshund": 881680711,
+        "yyokuu": 1209391999,
+        "chanceful": 294358786,
+        "smashboyj": 296062464
+      },
+      "roles": {
+        "charmingchari76": "POC",
+        ".17250": "Core",
+        "laquaviente": "Core",
+        "roxycotin": "Core",
+        "the.dachshund": "Core",
+        "yyokuu": "Core",
+        "chanceful": "Sub",
+        "smashboyj": "Sub"
+      }
+    },
+    "Cheat Death": {
+      "team_id": 255,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        ".cheerioo": 920866947,
+        "bbungus": 323267908,
+        "clampb": 494408122,
+        "noobbbb_": 930621265,
+        "swuupie": 1082853779,
+        "xx_uwu_xx": 1235312023,
+        "dune_": 390827779,
+        "surgeofmemories": 422423186
+      },
+      "roles": {
+        ".cheerioo": "POC",
+        "bbungus": "Core",
+        "clampb": "Core",
+        "noobbbb_": "Core",
+        "swuupie": "Core",
+        "xx_uwu_xx": "Core",
+        "dune_": "Sub",
+        "surgeofmemories": "Sub"
+      }
+    },
+    "Chico Fan Club": {
+      "team_id": 290,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "moosii": 112247827,
+        "2monday": 294070175,
+        "argusfps": 1014713246,
+        "hamakawawakano": 181303505,
+        "loganfake": 144548381,
+        "madann": 385285132
+      },
+      "roles": {
+        "moosii": "POC",
+        "2monday": "Core",
+        "argusfps": "Core",
+        "hamakawawakano": "Core",
+        "loganfake": "Core",
+        "madann": "Core"
+      }
+    },
+    "Chuds": {
+      "team_id": 367,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "bompkin": 844709568,
+        "brendvnn": 1240501226,
+        "pmdtr": 218025146,
+        "qwacked": 1083721512,
+        "robgster": 332849379,
+        "xdxdxdxdxdxdxdxdxdxddxdd": 135552275,
+        "akshay6256": 369620762,
+        "alexcraftv2": 847809847
+      },
+      "roles": {
+        "bompkin": "POC",
+        "brendvnn": "Core",
+        "pmdtr": "Core",
+        "qwacked": "Core",
+        "robgster": "Core",
+        "xdxdxdxdxdxdxdxdxdxddxdd": "Core",
+        "akshay6256": "Sub",
+        "alexcraftv2": "Sub"
+      }
+    },
+    "Clum": {
+      "team_id": 399,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "nnrrv": 169626420,
+        "829": 1012177830,
+        "bruhman1000": 916703726,
+        "ksan4289": 1863138122,
+        "meace": 1034413002,
+        "minty.cat": 131454870,
+        "revolver_fps": 91545510,
+        "sleepypandaa_g": 316106997
+      },
+      "roles": {
+        "nnrrv": "POC",
+        "829": "Core",
+        "bruhman1000": "Core",
+        "ksan4289": "Core",
+        "meace": "Core",
+        "minty.cat": "Core",
+        "revolver_fps": "Sub",
+        "sleepypandaa_g": "Sub"
+      }
+    },
+    "Crojo": {
+      "team_id": 427,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "masoff.": 460560974,
+        "arklark": 341870628,
+        "kaytuan": 349952310,
+        "_macky": 201143378,
+        "veryepic.": 1119260849,
+        "volvette": 912988895,
+        "tedd_e_": 112912246,
+        "wumbowl": 326478100
+      },
+      "roles": {
+        "masoff.": "POC",
+        "arklark": "Core",
+        "kaytuan": "Core",
+        "_macky": "Core",
+        "veryepic.": "Core",
+        "volvette": "Core",
+        "tedd_e_": "Sub",
+        "wumbowl": "Sub"
+      }
+    },
+    "Crustacean Nation": {
+      "team_id": 458,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        ".redhare.": 1429750483,
+        "frog8298": 1354225232,
+        "imnotanoob90201": 915452924,
+        "seriphix": 1344580201,
+        "shrimpus2000": 1601516668,
+        "werdrache": 920268667,
+        "goofygoober3987": 1420408557,
+        "huucii.": 1505888158
+      },
+      "roles": {
+        ".redhare.": "POC",
+        "frog8298": "Core",
+        "imnotanoob90201": "Core",
+        "seriphix": "Core",
+        "shrimpus2000": "Core",
+        "werdrache": "Core",
+        "goofygoober3987": "Sub",
+        "huucii.": "Sub"
+      }
+    },
+    "Daryl's Janitors": {
+      "team_id": 173,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "basedbasilgaming": 831226827,
+        "ddevinn": 285154524,
+        "dipdoo": 105531382,
+        "jordan__8265": 343871626,
+        "oogglie": 190003879,
+        "xbio": 139248282,
+        "cinika1": 831238087
+      },
+      "roles": {
+        "basedbasilgaming": "POC",
+        "ddevinn": "Core",
+        "dipdoo": "Core",
+        "jordan__8265": "Core",
+        "oogglie": "Core",
+        "xbio": "Core",
+        "cinika1": "Sub"
+      }
+    },
+    "dedlok": {
+      "team_id": 452,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "cigik": 922214030,
+        "epiphanyyy": 912321514,
+        "ikiru.dl": 1353606981,
+        "philip_b": 122065228,
+        "pulsealvar": 882993371,
+        "twotis": 394397982,
+        "suitcasefroglover": 1207271140
+      },
+      "roles": {
+        "cigik": "POC",
+        "epiphanyyy": "Core",
+        "ikiru.dl": "Core",
+        "philip_b": "Core",
+        "pulsealvar": "Core",
+        "twotis": "Core",
+        "suitcasefroglover": "Sub"
+      }
+    },
+    "Dominion": {
+      "team_id": 392,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "grim0198": 70476707,
+        "danndingus": 199549203,
+        "devinsuhxx": 1027926432,
+        "lemsanoid": 95969345,
+        "thebigdream": 393426449,
+        "umarrehan": 370389280,
+        "tripled714": 841272706
+      },
+      "roles": {
+        "grim0198": "POC",
+        "danndingus": "Core",
+        "devinsuhxx": "Core",
+        "lemsanoid": "Core",
+        "thebigdream": "Core",
+        "umarrehan": "Core",
+        "tripled714": "Sub"
+      }
+    },
+    "Don't Parry Me": {
+      "team_id": 403,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "nic011923": 1053092379,
+        "andrewgreaves11": 885735713,
+        "jaseprix": 191285767,
+        "ladderglide": 781257807,
+        "mun115": 1842219003,
+        "svdhss": 1411360,
+        "ch1rp_": 104303318,
+        "nameunknown0000": 1218596880
+      },
+      "roles": {
+        "nic011923": "POC",
+        "andrewgreaves11": "Core",
+        "jaseprix": "Core",
+        "ladderglide": "Core",
+        "mun115": "Core",
+        "svdhss": "Core",
+        "ch1rp_": "Sub",
+        "nameunknown0000": "Sub"
+      }
+    },
+    "Double M Academy": {
+      "team_id": 385,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "breadzzy1010": 314808571,
+        "bopguy.": 148359238,
+        "cellery100": 113002695,
+        "cjor100": 93346925,
+        "smupee": 1156668838,
+        "thagamersbuffet": 853206774,
+        "finnkk.": 316700645,
+        "wooper410": 993604844
+      },
+      "roles": {
+        "breadzzy1010": "POC",
+        "bopguy.": "Core",
+        "cellery100": "Core",
+        "cjor100": "Core",
+        "smupee": "Core",
+        "thagamersbuffet": "Core",
+        "finnkk.": "Sub",
+        "wooper410": "Sub"
+      }
+    },
+    "Eat Your Greens": {
+      "team_id": 380,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "manamyth": 896003014,
+        "cloudburstow": 132078179,
+        "mynamejolt": 95157983,
+        "sydekic": 207601205,
+        "waterlogged41": 1261328180,
+        "xxxbubbyxxx": 68188794,
+        "techtoxic": 302662784
+      },
+      "roles": {
+        "manamyth": "POC",
+        "cloudburstow": "Core",
+        "mynamejolt": "Core",
+        "sydekic": "Core",
+        "waterlogged41": "Core",
+        "xxxbubbyxxx": "Core",
+        "techtoxic": "Sub"
+      }
+    },
+    "Edgebugs": {
+      "team_id": 444,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "tenns.": 164064333,
+        "foogzicle": 439926515,
+        "l.__.__.": 149364661,
+        "neel101": 299197018,
+        "pxlling.": 401117074,
+        "uhkeera": 306927885,
+        "_faint": 105287835,
+        "megadirtpotato": 393391025
+      },
+      "roles": {
+        "tenns.": "POC",
+        "foogzicle": "Core",
+        "l.__.__.": "Core",
+        "neel101": "Core",
+        "pxlling.": "Core",
+        "uhkeera": "Core",
+        "_faint": "Sub",
+        "megadirtpotato": "Sub"
+      }
+    },
+    "Emoji Aim": {
+      "team_id": 447,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "renla_": 921743627,
+        "feign1917": 52375646,
+        ".keepsake": 839066154,
+        "kony995": 24750365,
+        "txk_t": 1271861251,
+        "xaviere2": 1020052051,
+        "ohji": 1074100534,
+        "pain___": 175259105
+      },
+      "roles": {
+        "renla_": "POC",
+        "feign1917": "Core",
+        ".keepsake": "Core",
+        "kony995": "Core",
+        "txk_t": "Core",
+        "xaviere2": "Core",
+        "ohji": "Sub",
+        "pain___": "Sub"
+      }
+    },
+    "EMWDTTTHTDWT": {
+      "team_id": 414,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "elgorg": 338963637,
+        "camobug": 286546838,
+        "luminull.": 240140618,
+        "mario1.com": 275862502,
+        "qqsrwcvwgwbsf": 921070661,
+        "shadsworkshop": 1166809712
+      },
+      "roles": {
+        "elgorg": "POC",
+        "camobug": "Core",
+        "luminull.": "Core",
+        "mario1.com": "Core",
+        "qqsrwcvwgwbsf": "Core",
+        "shadsworkshop": "Core"
+      }
+    },
+    "Event Horizon": {
+      "team_id": 373,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "sportsguy1012": 1850377914,
+        "0man71": 897380644,
+        "angel14x.": 1109018717,
+        "drummajorsamm365": 1020872745,
+        "admiralpete": 492390853,
+        "youngtizzy": 203054306
+      },
+      "roles": {
+        "sportsguy1012": "POC",
+        "0man71": "Core",
+        "angel14x.": "Core",
+        "drummajorsamm365": "Core",
+        "admiralpete": "Sub",
+        "youngtizzy": "Sub"
+      }
+    },
+    "Fat Chuds": {
+      "team_id": 397,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "spider34.": 913555909,
+        "hyper096315": 1023253333,
+        "lamium.": 249450959,
+        "_spydyr_": 125564742,
+        "tealbaron": 312125202,
+        "telefrog": 917527581,
+        "lhuvnova": 1927195656,
+        "sexytexy": 298504089
+      },
+      "roles": {
+        "spider34.": "POC",
+        "hyper096315": "Core",
+        "lamium.": "Core",
+        "_spydyr_": "Core",
+        "tealbaron": "Core",
+        "telefrog": "Core",
+        "lhuvnova": "Sub",
+        "sexytexy": "Sub"
+      }
+    },
+    "Fish n Ships": {
+      "team_id": 465,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "obis_": 114080783,
+        "cane1337": 387970322,
+        "laserzera": 315214392,
+        "notiship": 125071052,
+        "phh__": 1673330534,
+        "zunalol01": 134946939,
+        "clickeey": 1263695237
+      },
+      "roles": {
+        "obis_": "POC",
+        "cane1337": "Core",
+        "laserzera": "Core",
+        "notiship": "Core",
+        "phh__": "Core",
+        "zunalol01": "Core",
+        "clickeey": "Sub"
+      }
+    },
+    "Fleetfoot Mac": {
+      "team_id": 76,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "frankabagnale": 70731077,
+        "46.73": 220453711,
+        "alenanga": 64928821,
+        "aquatism": 38974452,
+        "flinnshadow": 221385043,
+        "real_grey": 311847058,
+        "kendalltoll": 146431103,
+        "tygoldy23": 331095415
+      },
+      "roles": {
+        "frankabagnale": "POC",
+        "46.73": "Core",
+        "alenanga": "Core",
+        "aquatism": "Core",
+        "flinnshadow": "Core",
+        "real_grey": "Core",
+        "kendalltoll": "Sub",
+        "tygoldy23": "Sub"
+      }
+    },
+    "Fly High Anjoki": {
+      "team_id": 402,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "mr.legit5162": 408875856,
+        "abramster": 211225837,
+        "aloofkoi": 205100546,
+        "careless_": 130824811,
+        "kilikajr": 321345177,
+        "mello728": 365938028,
+        "anarchyrules": 238458665
+      },
+      "roles": {
+        "mr.legit5162": "POC",
+        "abramster": "Core",
+        "aloofkoi": "Core",
+        "careless_": "Core",
+        "kilikajr": "Core",
+        "mello728": "Core",
+        "anarchyrules": "Sub"
+      }
+    },
+    "Frauds": {
+      "team_id": 430,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "jxmiku": 194433277,
+        "akace100": 301195105,
+        "justwarden.": 236078002,
+        "smile2930": 1066895922,
+        "spooke1580": 839455474,
+        "ultimatefirestar": 216072157,
+        "ioxle": 839852011,
+        "projecki": 131862446
+      },
+      "roles": {
+        "jxmiku": "POC",
+        "akace100": "Core",
+        "justwarden.": "Core",
+        "smile2930": "Core",
+        "spooke1580": "Core",
+        "ultimatefirestar": "Core",
+        "ioxle": "Sub",
+        "projecki": "Sub"
+      }
+    },
+    "Friends of Goomanity": {
+      "team_id": 41,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "masedog01": 133722643,
+        "cubancrocodylus": 1008806286,
+        "imakrxm": 1147780655,
+        "lazarus.sheep": 294230795,
+        "redballssss": 229290934,
+        "redcreeper": 1239944832,
+        "amsung": 245490435,
+        "finny2257": 26488163
+      },
+      "roles": {
+        "masedog01": "POC",
+        "cubancrocodylus": "Core",
+        "imakrxm": "Core",
+        "lazarus.sheep": "Core",
+        "redballssss": "Core",
+        "redcreeper": "Core",
+        "amsung": "Sub",
+        "finny2257": "Sub"
+      }
+    },
+    "Gallo Muerto": {
+      "team_id": 126,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "gphellmonger": 398351673,
+        ".ambush.": 341492689,
+        "golotake3": 1011794300,
+        "rigmedon": 140416139,
+        "silkyjohnson_": 169813251,
+        "vladinhalerofrats": 1030326109,
+        "grimblesthegainsgoblin": 39149137,
+        "miller.time": 41642346
+      },
+      "roles": {
+        "gphellmonger": "POC",
+        ".ambush.": "Core",
+        "golotake3": "Core",
+        "rigmedon": "Core",
+        "silkyjohnson_": "Core",
+        "vladinhalerofrats": "Core",
+        "grimblesthegainsgoblin": "Sub",
+        "miller.time": "Sub"
+      }
+    },
+    "genuinely": {
+      "team_id": 506,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "taigogorawr": 87355410,
+        "792x57": 83754378,
+        "mechashop": 180434877,
+        "spaghetti2954": 450196813,
+        "sunsetters": 54174772,
+        "technolithic": 193139005,
+        "aokog": 362503015,
+        "filthy_westerner": 108100441
+      },
+      "roles": {
+        "taigogorawr": "POC",
+        "792x57": "Core",
+        "mechashop": "Core",
+        "spaghetti2954": "Core",
+        "sunsetters": "Core",
+        "technolithic": "Core",
+        "aokog": "Sub",
+        "filthy_westerner": "Sub"
+      }
+    },
+    "Gganbu Gang": {
+      "team_id": 45,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "shortened2max": 108131888,
+        "ada7437": 1475330546,
+        "_cherryyy": 842011460,
+        "mvrdy": 1260829408,
+        "skelly8795": 1038816921,
+        "theraffytaffy": 906243618,
+        "jules74": 134284163,
+        "xanderr0837": 1566939434
+      },
+      "roles": {
+        "shortened2max": "POC",
+        "ada7437": "Core",
+        "_cherryyy": "Core",
+        "mvrdy": "Core",
+        "skelly8795": "Core",
+        "theraffytaffy": "Core",
+        "jules74": "Sub",
+        "xanderr0837": "Sub"
+      }
+    },
+    "GoldenGummit": {
+      "team_id": 407,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "zekken2378": 838852571,
+        "3vanm": 1831803581,
+        "callofdutyworldatwar": 1294978207,
+        "goodtone": 58999959,
+        "guiltygearstrive": 1132440980,
+        "snakeninjakrool": 1816142882,
+        "portal1fan72": 1028654230
+      },
+      "roles": {
+        "zekken2378": "POC",
+        "3vanm": "Core",
+        "callofdutyworldatwar": "Core",
+        "goodtone": "Core",
+        "guiltygearstrive": "Core",
+        "snakeninjakrool": "Core",
+        "portal1fan72": "Sub"
+      }
+    },
+    "Grass Mud Horse": {
+      "team_id": 288,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "stuntmanjulian": 1227395612,
+        "bhagavad": 108670857,
+        "makkura": 1047097270,
+        "shad_unoxx": 150362359,
+        "stillkiwi": 911579446,
+        "thenarwhal182": 854038765,
+        "nutthewhite": 156015596,
+        "taly18": 1626541424
+      },
+      "roles": {
+        "stuntmanjulian": "POC",
+        "bhagavad": "Core",
+        "makkura": "Core",
+        "shad_unoxx": "Core",
+        "stillkiwi": "Core",
+        "thenarwhal182": "Core",
+        "nutthewhite": "Sub",
+        "taly18": "Sub"
+      }
+    },
+    "Gup Team 6": {
+      "team_id": 326,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "manzia": 190513568,
+        "glitchhs": 1084400561,
+        "prognosticator": 197222765,
+        "swiftisslow": 1076339148,
+        "tyrvv": 1576723802,
+        "thefinalboss_.": 429541677
+      },
+      "roles": {
+        "manzia": "POC",
+        "glitchhs": "Core",
+        "prognosticator": "Core",
+        "swiftisslow": "Core",
+        "tyrvv": "Core",
+        "thefinalboss_.": "Sub"
+      }
+    },
+    "Gurt Hunters": {
+      "team_id": 443,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "bellahadid69": 352475735,
+        "anthony02496": 26982217,
+        "basturhd": 131942477,
+        "cornymfa": 356484766,
+        "mangomana": 157003563,
+        "plexiuss": 125671933,
+        "oingoboingo4038": 142491788,
+        "pen.lsland": 237441391
+      },
+      "roles": {
+        "bellahadid69": "POC",
+        "anthony02496": "Core",
+        "basturhd": "Core",
+        "cornymfa": "Core",
+        "mangomana": "Core",
+        "plexiuss": "Core",
+        "oingoboingo4038": "Sub",
+        "pen.lsland": "Sub"
+      }
+    },
+    "Hello Friends": {
+      "team_id": 461,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "whosryden": 293099966,
+        "akeyv": 920225533,
+        "caster1739": 1115868264,
+        "nowahboah": 1485240636,
+        "onelev": 928298578,
+        "wuu_yaa": 1441189694
+      },
+      "roles": {
+        "whosryden": "POC",
+        "akeyv": "Core",
+        "caster1739": "Core",
+        "nowahboah": "Core",
+        "onelev": "Core",
+        "wuu_yaa": "Core"
+      }
+    },
+    "Helmet Gang": {
+      "team_id": 468,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "mainmoose": 191893233,
+        "deathpenguinzyg": 134818439,
+        "omgpopcorn": 104630999,
+        "shakemachete": 104887913,
+        "spoogati": 202760587,
+        "__teh": 134706038,
+        "bignuko": 324104693,
+        "caitpepsi": 463327206
+      },
+      "roles": {
+        "mainmoose": "POC",
+        "deathpenguinzyg": "Core",
+        "omgpopcorn": "Core",
+        "shakemachete": "Core",
+        "spoogati": "Core",
+        "__teh": "Core",
+        "bignuko": "Sub",
+        "caitpepsi": "Sub"
+      }
+    },
+    "Hero Shooters Anonymous": {
+      "team_id": 155,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "nicedom": 58777542,
+        "basilicass": 354889665,
+        "ferb5546": 489078669,
+        "hoizin": 457387164,
+        "masudore": 252298503,
+        "rytu": 844080638,
+        "moelandblue": 114759724
+      },
+      "roles": {
+        "nicedom": "POC",
+        "basilicass": "Core",
+        "ferb5546": "Core",
+        "hoizin": "Core",
+        "masudore": "Core",
+        "rytu": "Core",
+        "moelandblue": "Sub"
+      }
+    },
+    "Hex Appeal": {
+      "team_id": 412,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "cayneswraith": 106580947,
+        "arthas419": 846250573,
+        "chugmaballz": 893793790,
+        "lovablekitsune": 249026940,
+        "_poroking": 244956513,
+        "wesleysnipes72": 1855772057,
+        "crashman2600": 1145244219,
+        "xeang": 429193081
+      },
+      "roles": {
+        "cayneswraith": "POC",
+        "arthas419": "Core",
+        "chugmaballz": "Core",
+        "lovablekitsune": "Core",
+        "_poroking": "Core",
+        "wesleysnipes72": "Core",
+        "crashman2600": "Sub",
+        "xeang": "Sub"
+      }
+    },
+    "HOTSOUP!": {
+      "team_id": 179,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "skyy1020": 1084011958,
+        "360nodad": 255013353,
+        "aiyah.6188": 187776273,
+        "methyl": 133223155,
+        "sabre_dl": 1098838109,
+        "snacks1": 1866574818
+      },
+      "roles": {
+        "skyy1020": "POC",
+        "360nodad": "Core",
+        "aiyah.6188": "Core",
+        "methyl": "Core",
+        "sabre_dl": "Core",
+        "snacks1": "Core"
+      }
+    },
+    "Hurtz Doughnuts": {
+      "team_id": 439,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "_spaceprincess": 107107773,
+        "adirtyfishtank": 74436457,
+        "gerglee": 48956183,
+        "gummedshoe": 1067204638,
+        "pdcal": 190334314,
+        "radkickflips": 64906439,
+        "bidetvid": 158820553,
+        "nickcc22": 180920072
+      },
+      "roles": {
+        "_spaceprincess": "POC",
+        "adirtyfishtank": "Core",
+        "gerglee": "Core",
+        "gummedshoe": "Core",
+        "pdcal": "Core",
+        "radkickflips": "Core",
+        "bidetvid": "Sub",
+        "nickcc22": "Sub"
+      }
+    },
+    "Ignored by PUGS": {
+      "team_id": 319,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "chemithly": 1076384478,
+        "comfythereaper": 396849097,
+        "larvzii": 402318415,
+        "palmtree113": 301022797,
+        "sophie.ice": 979999127,
+        "v1thebandit": 1162549913,
+        "tempired": 1110076039,
+        "turtleosx": 106186371
+      },
+      "roles": {
+        "chemithly": "POC",
+        "comfythereaper": "Core",
+        "larvzii": "Core",
+        "palmtree113": "Core",
+        "sophie.ice": "Core",
+        "v1thebandit": "Core",
+        "tempired": "Sub",
+        "turtleosx": "Sub"
+      }
+    },
+    "Invictus": {
+      "team_id": 372,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "iwirez": 133082460,
+        "doomlocx": 1137291278,
+        "forest98.": 83567511,
+        "hollowpizzaman": 1219905868,
+        "itsjnew": 859658373,
+        "sicariodeluxe": 381859975,
+        "twxxnty": 262536564
+      },
+      "roles": {
+        "iwirez": "POC",
+        "doomlocx": "Core",
+        "forest98.": "Core",
+        "hollowpizzaman": "Core",
+        "itsjnew": "Core",
+        "sicariodeluxe": "Core",
+        "twxxnty": "Sub"
+      }
+    },
+    "IPHONEUSERS": {
+      "team_id": 364,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "replaythatshit": 1021112146,
+        "spaceplex": 186216690
+      },
+      "roles": {
+        "replaythatshit": "POC",
+        "spaceplex": "Core"
+      }
+    },
+    "IRA DOMINI": {
+      "team_id": 462,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "shoot4": 135315006,
+        "auh9x9a0z": 1055675015,
+        "jeej_521": 1251178686,
+        "mica0472": 1854026821,
+        "nvoupraescola": 1043212707,
+        "rebs2._.sla": 1485620008,
+        "golestoque": 1053307266,
+        "speedzilla": 975536487
+      },
+      "roles": {
+        "shoot4": "POC",
+        "auh9x9a0z": "Core",
+        "jeej_521": "Core",
+        "mica0472": "Core",
+        "nvoupraescola": "Core",
+        "rebs2._.sla": "Core",
+        "golestoque": "Sub",
+        "speedzilla": "Sub"
+      }
+    },
+    "Jezebels Janitors": {
+      "team_id": 497,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "nellotea": 1226958389,
+        "cranatictheberry": 1567227915,
+        "g2dtupot": 358271167,
+        "gwynsaov": 195360011,
+        "mountmikey": 109089326,
+        "_therosedetective_": 1049525513,
+        "breakbills": 237239703,
+        "legdenman": 1269047819
+      },
+      "roles": {
+        "nellotea": "POC",
+        "cranatictheberry": "Core",
+        "g2dtupot": "Core",
+        "gwynsaov": "Core",
+        "mountmikey": "Core",
+        "_therosedetective_": "Core",
+        "breakbills": "Sub",
+        "legdenman": "Sub"
+      }
+    },
+    "Krill Shot": {
+      "team_id": 114,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "hero_jake": 87415947,
+        "beeshly": 393582024,
+        "boleh": 65003916,
+        "connely": 121110147,
+        "picklesdl": 1087438561,
+        "sjwbush": 130064303,
+        "btw_bucketdoggo": 873978448,
+        "nerdbudiezv1": 1113456874
+      },
+      "roles": {
+        "hero_jake": "POC",
+        "beeshly": "Core",
+        "boleh": "Core",
+        "connely": "Core",
+        "picklesdl": "Core",
+        "sjwbush": "Core",
+        "btw_bucketdoggo": "Sub",
+        "nerdbudiezv1": "Sub"
+      }
+    },
+    "Laika Academy": {
+      "team_id": 375,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "dekter": 338482825,
+        "blizzardscythe": 1211063693,
+        ".nyxiebitsy": 339896077,
+        "onalo": 758542787,
+        "ratchampion": 246570560,
+        "zojdl": 1125042021
+      },
+      "roles": {
+        "dekter": "POC",
+        "blizzardscythe": "Core",
+        ".nyxiebitsy": "Core",
+        "onalo": "Core",
+        "ratchampion": "Core",
+        "zojdl": "Core"
+      }
+    },
+    "Laika Esports": {
+      "team_id": 186,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "paintedow": 1190288924,
+        "derpytsumtsum": 1423948801,
+        "joshk8300": 235681833,
+        "p1atypu3": 928583062,
+        "relaxmatt": 195489240,
+        "rhikuu": 414876771
+      },
+      "roles": {
+        "paintedow": "POC",
+        "derpytsumtsum": "Core",
+        "joshk8300": "Core",
+        "p1atypu3": "Core",
+        "relaxmatt": "Core",
+        "rhikuu": "Core"
+      }
+    },
+    "larplock": {
+      "team_id": 393,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "huthat2": 1788892052,
+        "1mforgotten": 1180804103,
+        "mag.money": 1168544906,
+        "prov1d3nce_va": 371806808,
+        "reddag": 59965193,
+        "shuliverse": 1135770976,
+        "scaryeyes": 59161043,
+        "yourfriend1111": 1281455641
+      },
+      "roles": {
+        "huthat2": "POC",
+        "1mforgotten": "Core",
+        "mag.money": "Core",
+        "prov1d3nce_va": "Core",
+        "reddag": "Core",
+        "shuliverse": "Core",
+        "scaryeyes": "Sub",
+        "yourfriend1111": "Sub"
+      }
+    },
+    "Lash-back": {
+      "team_id": 43,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "._.flare._.": 879863459,
+        "brogueofficial": 46610871,
+        "code2401": 138018082,
+        "kuhashhhhh": 1287183284,
+        "pynomite": 168696971,
+        "virologiclmp": 1061612412,
+        "addie_lyn": 209764877,
+        "dhyphenziggy": 852994039
+      },
+      "roles": {
+        "._.flare._.": "POC",
+        "brogueofficial": "Core",
+        "code2401": "Core",
+        "kuhashhhhh": "Core",
+        "pynomite": "Core",
+        "virologiclmp": "Core",
+        "addie_lyn": "Sub",
+        "dhyphenziggy": "Sub"
+      }
+    },
+    "Lets Eat": {
+      "team_id": 446,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "bravo9173": 370539037,
+        "9thmyst": 1634951974,
+        "drif.t": 993995205,
+        "epiczray": 134373966,
+        "f1zzle": 185633057,
+        "grug1_": 1120848378,
+        "breadkun": 12120487
+      },
+      "roles": {
+        "bravo9173": "POC",
+        "9thmyst": "Core",
+        "drif.t": "Core",
+        "epiczray": "Core",
+        "f1zzle": "Core",
+        "grug1_": "Core",
+        "breadkun": "Sub"
+      }
+    },
+    "LFAD Lovers": {
+      "team_id": 394,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "evanthegayweeb": 1280328620,
+        "arrow.mayo": 414678740,
+        "byrei": 263891776,
+        ".d1egox": 1034418670,
+        "starryisacutie": 312374246,
+        "waaav.": 1233172644,
+        "tairany": 158050985,
+        "whemey": 140219271
+      },
+      "roles": {
+        "evanthegayweeb": "POC",
+        "arrow.mayo": "Core",
+        "byrei": "Core",
+        ".d1egox": "Core",
+        "starryisacutie": "Core",
+        "waaav.": "Core",
+        "tairany": "Sub",
+        "whemey": "Sub"
+      }
+    },
+    "Light of Myths": {
+      "team_id": 441,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "mariomanz": 163188747,
+        "agntgibbs": 1172040550,
+        "kraken_val": 1047292862,
+        "levvyn": 1124381539,
+        "mutatedbread_": 166573841,
+        "noda_06412": 1046813674
+      },
+      "roles": {
+        "mariomanz": "POC",
+        "agntgibbs": "Core",
+        "kraken_val": "Core",
+        "levvyn": "Core",
+        "mutatedbread_": "Core",
+        "noda_06412": "Core"
+      }
+    },
+    "Lil' Goobers": {
+      "team_id": 496,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "filou2105": 490230507,
+        "akexisdaddy": 1148483457,
+        "embermesela": 315075241,
+        "jax_hy": 158981741,
+        "kazarrah": 1072544121,
+        "roods3913": 1277897065,
+        "croak7": 272231640,
+        "zackity_": 1171393152
+      },
+      "roles": {
+        "filou2105": "POC",
+        "akexisdaddy": "Core",
+        "embermesela": "Core",
+        "jax_hy": "Core",
+        "kazarrah": "Core",
+        "roods3913": "Core",
+        "croak7": "Sub",
+        "zackity_": "Sub"
+      }
+    },
+    "Livelock": {
+      "team_id": 348,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "fishnit": 320992111,
+        "artemissed._.": 1161834144,
+        "dratina": 1053291235,
+        "phenyx777": 1225243860,
+        "quantum_kitty_": 1258404535,
+        "spunchoverlord": 1008072766,
+        "aurorasky0": 179713062,
+        "goldemn": 441903073
+      },
+      "roles": {
+        "fishnit": "POC",
+        "artemissed._.": "Core",
+        "dratina": "Core",
+        "phenyx777": "Core",
+        "quantum_kitty_": "Core",
+        "spunchoverlord": "Core",
+        "aurorasky0": "Sub",
+        "goldemn": "Sub"
+      }
+    },
+    "Los Chavos": {
+      "team_id": 460,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "uriglockenspiel": 328116555,
+        "c1utchzz": 1011865924,
+        "dank_bonkripper81": 1017458263,
+        "gilloez": 1130441411,
+        "glowingduck": 907152376,
+        "_keal": 400151356
+      },
+      "roles": {
+        "uriglockenspiel": "POC",
+        "c1utchzz": "Core",
+        "dank_bonkripper81": "Core",
+        "gilloez": "Core",
+        "glowingduck": "Core",
+        "_keal": "Core"
+      }
+    },
+    "Luigi Board": {
+      "team_id": 499,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "numfa.": 242066117,
+        "groovyroomy": 1023176968,
+        "maxenceispog": 1239285564,
+        "nanacomehome": 81640321,
+        "painnodanna": 87875558,
+        "scarz8507": 216679006,
+        "sirlutanic": 88945740,
+        "soup_o_boy": 1262758091
+      },
+      "roles": {
+        "numfa.": "POC",
+        "groovyroomy": "Core",
+        "maxenceispog": "Core",
+        "nanacomehome": "Core",
+        "painnodanna": "Core",
+        "scarz8507": "Core",
+        "sirlutanic": "Sub",
+        "soup_o_boy": "Sub"
+      }
+    },
+    "Magic Car Pit": {
+      "team_id": 247,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "germanmilkman58": 395983232,
+        "dannybonjwa": 74125631,
+        "flarebat": 1052239789,
+        "salty_strats": 131900303,
+        "thedvnt": 73213173,
+        "zineless": 349062916,
+        "electric_was_taken": 1015801379,
+        "twiggybeast021": 1272439298
+      },
+      "roles": {
+        "germanmilkman58": "POC",
+        "dannybonjwa": "Core",
+        "flarebat": "Core",
+        "salty_strats": "Core",
+        "thedvnt": "Core",
+        "zineless": "Core",
+        "electric_was_taken": "Sub",
+        "twiggybeast021": "Sub"
+      }
+    },
+    "Magic Carpet Only": {
+      "team_id": 226,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "handler_05": 344153014,
+        "aredfox": 188859483,
+        "fueledbypants": 120420364,
+        "liontoast": 1021907745,
+        "mrt_txk": 1917878582,
+        "steel_commanders": 196006127,
+        ".garfunkle.": 400060310,
+        "tisso6.": 49319774
+      },
+      "roles": {
+        "handler_05": "POC",
+        "aredfox": "Core",
+        "fueledbypants": "Core",
+        "liontoast": "Core",
+        "mrt_txk": "Core",
+        "steel_commanders": "Core",
+        ".garfunkle.": "Sub",
+        "tisso6.": "Sub"
+      }
+    },
+    "Mantleglide": {
+      "team_id": 488,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "_snappl": 104267195,
+        "borbybrob": 1056894662,
+        "existant": 42747054,
+        "geminiival": 314331402,
+        "spiffyyy": 328755559,
+        "tolboox": 1619817560,
+        "common0x4e": 848444049
+      },
+      "roles": {
+        "_snappl": "POC",
+        "borbybrob": "Core",
+        "existant": "Core",
+        "geminiival": "Core",
+        "spiffyyy": "Core",
+        "tolboox": "Core",
+        "common0x4e": "Sub"
+      }
+    },
+    "Maryville Academy Deadlock Red": {
+      "team_id": 332,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "joe45": 331705952,
+        "echo2023": 342809220,
+        "i_am_aslan": 1795394576,
+        "nova_cod": 1221947051,
+        "sirdanker.": 1078581345,
+        "yukiharuki": 249058343,
+        "borger1": 1004384340,
+        "_mangoh": 1131310553
+      },
+      "roles": {
+        "joe45": "POC",
+        "echo2023": "Core",
+        "i_am_aslan": "Core",
+        "nova_cod": "Core",
+        "sirdanker.": "Core",
+        "yukiharuki": "Core",
+        "borger1": "Sub",
+        "_mangoh": "Sub"
+      }
+    },
+    "Melee Peeps": {
+      "team_id": 404,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "jaymoo0470": 311387556,
+        "2lemax": 1131511547,
+        "chrxstvphr": 123982523,
+        "glazedgoose": 65642099,
+        "koth_harvest_final": 34935015,
+        "rbtl": 177579708,
+        "replikoga": 167150
+      },
+      "roles": {
+        "jaymoo0470": "POC",
+        "2lemax": "Core",
+        "chrxstvphr": "Core",
+        "glazedgoose": "Core",
+        "koth_harvest_final": "Core",
+        "rbtl": "Core",
+        "replikoga": "Sub"
+      }
+    },
+    "Meowers": {
+      "team_id": 390,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "technicalwaffle": 353527988,
+        "clefalto": 193091153,
+        "disdoodeatfood": 400458620,
+        "jordantimes": 164299119,
+        "nikohno": 346082765,
+        "unimeno": 197593220,
+        "binarydomain": 324892067,
+        "rsky.": 206133831
+      },
+      "roles": {
+        "technicalwaffle": "POC",
+        "clefalto": "Core",
+        "disdoodeatfood": "Core",
+        "jordantimes": "Core",
+        "nikohno": "Core",
+        "unimeno": "Core",
+        "binarydomain": "Sub",
+        "rsky.": "Sub"
+      }
+    },
+    "Midbossers": {
+      "team_id": 459,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "sam.jam": 137126897,
+        "14162213v": 1014008341,
+        "ezebravo": 145295169,
+        "norpa": 1052776264,
+        ".skitsu": 1021424660,
+        "spjder.": 337132641,
+        "cheesygum": 220040449,
+        "d0zyan": 341316128
+      },
+      "roles": {
+        "sam.jam": "POC",
+        "14162213v": "Core",
+        "ezebravo": "Core",
+        "norpa": "Core",
+        ".skitsu": "Core",
+        "spjder.": "Core",
+        "cheesygum": "Sub",
+        "d0zyan": "Sub"
+      }
+    },
+    "Name Pending": {
+      "team_id": 449,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "leroythecat": 1272382047,
+        "gymical": 256512296,
+        "helloimhalo": 112699106,
+        "prota7": 1151877185,
+        "tommysalami.": 119797600
+      },
+      "roles": {
+        "leroythecat": "POC",
+        "gymical": "Core",
+        "helloimhalo": "Core",
+        "prota7": "Core",
+        "tommysalami.": "Core"
+      }
+    },
+    "Nebraska Esports": {
+      "team_id": 195,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "artik3398": 388548278,
+        "cloud4206": 1032997490,
+        "kaifs": 236574534,
+        "neptic": 321073742,
+        "shromo_ow": 1127203029,
+        "sometimeow": 317196533,
+        "woodyseth1": 168934757
+      },
+      "roles": {
+        "artik3398": "POC",
+        "cloud4206": "Core",
+        "kaifs": "Core",
+        "neptic": "Core",
+        "shromo_ow": "Core",
+        "sometimeow": "Core",
+        "woodyseth1": "Sub"
+      }
+    },
+    "NebraskaEsports: Retirement Home": {
+      "team_id": 197,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "blitz5046": 1038172184,
+        "chillytree": 1091031973,
+        "kelpo31": 868458075,
+        "trqnx": 920364581,
+        "whovian77": 409383103,
+        "zeke_master": 937449683,
+        "roserapaine": 393293669
+      },
+      "roles": {
+        "blitz5046": "POC",
+        "chillytree": "Core",
+        "kelpo31": "Core",
+        "trqnx": "Core",
+        "whovian77": "Core",
+        "zeke_master": "Core",
+        "roserapaine": "Sub"
+      }
+    },
+    "New York Gankees": {
+      "team_id": 39,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "thedm125": 967130194,
+        "cig_beef": 101435722,
+        "hasukin": 1716633975,
+        "jackieblazar": 312462282,
+        "spanglemoth": 55624502,
+        "wuntraced": 1191812110,
+        "cxrz1of1": 1127237742,
+        "_mackay": 838978364
+      },
+      "roles": {
+        "thedm125": "POC",
+        "cig_beef": "Core",
+        "hasukin": "Core",
+        "jackieblazar": "Core",
+        "spanglemoth": "Core",
+        "wuntraced": "Core",
+        "cxrz1of1": "Sub",
+        "_mackay": "Sub"
+      }
+    },
+    "No Healing Only Tempo": {
+      "team_id": 57,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "_._daniel_._": 32921286,
+        "alegnus": 1015206251,
+        "hollywoodcolex": 169953861,
+        "razzartg": 12177195,
+        "starsisteramosa": 238783017,
+        "thooorn": 910099604,
+        "communistwyvern": 188143459,
+        "jonnyjawn": 163449910
+      },
+      "roles": {
+        "_._daniel_._": "POC",
+        "alegnus": "Core",
+        "hollywoodcolex": "Core",
+        "razzartg": "Core",
+        "starsisteramosa": "Core",
+        "thooorn": "Core",
+        "communistwyvern": "Sub",
+        "jonnyjawn": "Sub"
+      }
+    },
+    "Noobs Gaymers": {
+      "team_id": 425,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "noobiboobi": 318499809,
+        "generated_username17": 358945212,
+        "hello87656787": 1071466297,
+        "jrflyboy618": 1487008664,
+        "mellimel1980": 234513935,
+        "p4n1c0193": 301426909
+      },
+      "roles": {
+        "noobiboobi": "POC",
+        "generated_username17": "Core",
+        "hello87656787": "Core",
+        "jrflyboy618": "Core",
+        "mellimel1980": "Core",
+        "p4n1c0193": "Core"
+      }
+    },
+    "Oops All Frontliners": {
+      "team_id": 150,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "plebineezer": 256123057,
+        "businessofduck": 472193582,
+        "genomelol": 1101413027,
+        "gorplyfindlebottom": 1633303312,
+        "juhsper": 328928114,
+        "senpaibanaba": 118811391,
+        "sophmin_": 366248043,
+        "umbycortex": 1161685937
+      },
+      "roles": {
+        "plebineezer": "POC",
+        "businessofduck": "Core",
+        "genomelol": "Core",
+        "gorplyfindlebottom": "Core",
+        "juhsper": "Core",
+        "senpaibanaba": "Core",
+        "sophmin_": "Sub",
+        "umbycortex": "Sub"
+      }
+    },
+    "OvertakeSector": {
+      "team_id": 21,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "0.sheep.0": 1018394217,
+        "darst04": 110595999,
+        "delinquent_2006": 1034713494,
+        "e.in.": 291942640,
+        "king.koopa.": 1231457200,
+        "kitsuene": 174182619,
+        "maxx_02": 85139576,
+        "vcipher": 320648270
+      },
+      "roles": {
+        "0.sheep.0": "POC",
+        "darst04": "Core",
+        "delinquent_2006": "Core",
+        "e.in.": "Core",
+        "king.koopa.": "Core",
+        "kitsuene": "Core",
+        "maxx_02": "Sub",
+        "vcipher": "Sub"
+      }
+    },
+    "Pain University": {
+      "team_id": 464,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "slopcat": 335769170,
+        "msceptilite2.0": 808827116,
+        "omarion19": 357958459,
+        "sillywilly7528": 342738363,
+        ".xanana": 1199476746,
+        "gamerbutswag67": 1532180008,
+        "itscharapy": 1106351270
+      },
+      "roles": {
+        "slopcat": "POC",
+        "msceptilite2.0": "Core",
+        "omarion19": "Core",
+        "sillywilly7528": "Core",
+        ".xanana": "Core",
+        "gamerbutswag67": "Sub",
+        "itscharapy": "Sub"
+      }
+    },
+    "Persia": {
+      "team_id": 405,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "evow.": 1863709231,
+        "jaw.": 368920009,
+        "noirinho": 1800005695,
+        "pizechi": 1225911557,
+        "uchiha0001": 96152351,
+        "zpwnage": 1115080455,
+        "yushi._": 1682446409
+      },
+      "roles": {
+        "evow.": "POC",
+        "jaw.": "Core",
+        "noirinho": "Core",
+        "pizechi": "Core",
+        "uchiha0001": "Core",
+        "zpwnage": "Core",
+        "yushi._": "Sub"
+      }
+    },
+    "Phreaky Phriday Deadlock": {
+      "team_id": 379,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "luxiorchango": 186541723,
+        "daizybelle": 1245308661,
+        "gametr": 1271462820,
+        ".secret_police": 1848534583,
+        "thmig_": 406389015,
+        "zernoz_": 1431718007,
+        "kusogari": 95192304,
+        "rootwo": 124677180
+      },
+      "roles": {
+        "luxiorchango": "POC",
+        "daizybelle": "Core",
+        "gametr": "Core",
+        ".secret_police": "Core",
+        "thmig_": "Core",
+        "zernoz_": "Core",
+        "kusogari": "Sub",
+        "rootwo": "Sub"
+      }
+    },
+    "Plobby united": {
+      "team_id": 420,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "r54.": 320110111,
+        "deweh": 295533505,
+        "divine._.": 222289295,
+        "plossy": 1163787770,
+        "rauriie": 251525019,
+        "turtleblazer": 1185553483,
+        "xyutaxiv": 924106908
+      },
+      "roles": {
+        "r54.": "POC",
+        "deweh": "Core",
+        "divine._.": "Core",
+        "plossy": "Core",
+        "rauriie": "Core",
+        "turtleblazer": "Core",
+        "xyutaxiv": "Sub"
+      }
+    },
+    "Plot Armor": {
+      "team_id": 328,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "chaotic224": 202002239,
+        "ilovewhitewomen": 1088237555,
+        "_keefy.": 390479281,
+        "marcelsleftnut": 908753682,
+        "ssabb": 1027800766,
+        "wanderingspoon": 1612669205,
+        "sheriffrango1": 177828323
+      },
+      "roles": {
+        "chaotic224": "POC",
+        "ilovewhitewomen": "Core",
+        "_keefy.": "Core",
+        "marcelsleftnut": "Core",
+        "ssabb": "Core",
+        "wanderingspoon": "Core",
+        "sheriffrango1": "Sub"
+      }
+    },
+    "Procrastinators": {
+      "team_id": 61,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "mr.l144": 149349432,
+        "6ers.": 22802674,
+        "deathninja3": 907647212,
+        "miiboshi": 122528976,
+        "paaxl": 1463573366,
+        "poke_277": 311713501,
+        "alixxers": 903882315,
+        "matrixyst": 357042331
+      },
+      "roles": {
+        "mr.l144": "POC",
+        "6ers.": "Core",
+        "deathninja3": "Core",
+        "miiboshi": "Core",
+        "paaxl": "Core",
+        "poke_277": "Core",
+        "alixxers": "Sub",
+        "matrixyst": "Sub"
+      }
+    },
+    "Project BOOM": {
+      "team_id": 363,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "isaac1720": 920429427,
+        "bylethxshez": 989865499,
+        "gubbins1": 367089569,
+        "joe_bi_done": 209718867,
+        "myrustycat": 1269724074,
+        "steak_sj": 322004228,
+        "gearbox77": 440618043,
+        "zammo_smash": 1024309215
+      },
+      "roles": {
+        "isaac1720": "POC",
+        "bylethxshez": "Core",
+        "gubbins1": "Core",
+        "joe_bi_done": "Core",
+        "myrustycat": "Core",
+        "steak_sj": "Core",
+        "gearbox77": "Sub",
+        "zammo_smash": "Sub"
+      }
+    },
+    "Pushin 30 Esports": {
+      "team_id": 421,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "averygdh": 298839408,
+        "barius3030": 1579080052,
+        "fear9029": 1037723124,
+        "jonocel": 428639652,
+        "quietwas": 488469708,
+        "yeckler": 474501245,
+        "whosyzo": 415088763,
+        "xternal": 274774324
+      },
+      "roles": {
+        "averygdh": "POC",
+        "barius3030": "Core",
+        "fear9029": "Core",
+        "jonocel": "Core",
+        "quietwas": "Core",
+        "yeckler": "Core",
+        "whosyzo": "Sub",
+        "xternal": "Sub"
+      }
+    },
+    "Random Shenanigans": {
+      "team_id": 413,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "jedibobo12": 15333424,
+        "arlo250": 1693577312,
+        "error7336": 1485345491,
+        "fishyonm3100": 1127074832,
+        "theofficialpanguino": 1851900176,
+        "v1nlandd": 1903871470,
+        "explodatorium": 296683736,
+        "playingbucket": 177161237
+      },
+      "roles": {
+        "jedibobo12": "POC",
+        "arlo250": "Core",
+        "error7336": "Core",
+        "fishyonm3100": "Core",
+        "theofficialpanguino": "Core",
+        "v1nlandd": "Core",
+        "explodatorium": "Sub",
+        "playingbucket": "Sub"
+      }
+    },
+    "Rejuv Crystals": {
+      "team_id": 498,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "darckriser": 231687425,
+        "drftkaido": 311858215,
+        "joshn_": 200414285,
+        "moderateclown": 838980190,
+        "qk_pawn": 1419601408,
+        "satchpatch": 101409747
+      },
+      "roles": {
+        "darckriser": "POC",
+        "drftkaido": "Core",
+        "joshn_": "Core",
+        "moderateclown": "Core",
+        "qk_pawn": "Core",
+        "satchpatch": "Core"
+      }
+    },
+    "Rejuvenated": {
+      "team_id": 295,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "shisio1": 1879868321,
+        "az_mo": 439797749,
+        "geronimo_stilton": 442890099,
+        "guins": 438958527,
+        "mrcakess": 1845275049,
+        "ridgway_ow": 1159495228,
+        "37chap": 1130181001
+      },
+      "roles": {
+        "shisio1": "POC",
+        "az_mo": "Core",
+        "geronimo_stilton": "Core",
+        "guins": "Core",
+        "mrcakess": "Core",
+        "ridgway_ow": "Core",
+        "37chap": "Sub"
+      }
+    },
+    "REMpire": {
+      "team_id": 64,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "rozyke": 896078936,
+        "mechanyxx": 134768982,
+        "onyx0001": 387885975,
+        "shreiner": 151802251,
+        "threepointer": 432027614,
+        "unwishable": 85498987,
+        "taaruu": 1097013705
+      },
+      "roles": {
+        "rozyke": "POC",
+        "mechanyxx": "Core",
+        "onyx0001": "Core",
+        "shreiner": "Core",
+        "threepointer": "Core",
+        "unwishable": "Core",
+        "taaruu": "Sub"
+      }
+    },
+    "Rent Controlled": {
+      "team_id": 296,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "ruins_": 180107057,
+        "carnivalspider": 73682903,
+        "cherry_blossom": 398394722,
+        "silentmystly": 1114776101,
+        "valley_founder": 122275362,
+        "xdasylum_": 342861317,
+        "4orke": 209867834,
+        "auxtris": 145106341
+      },
+      "roles": {
+        "ruins_": "POC",
+        "carnivalspider": "Core",
+        "cherry_blossom": "Core",
+        "silentmystly": "Core",
+        "valley_founder": "Core",
+        "xdasylum_": "Core",
+        "4orke": "Sub",
+        "auxtris": "Sub"
+      }
+    },
+    "Replacements": {
+      "team_id": 63,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "saucepan14": 82531432,
+        "mckielny": 342100891,
+        "__meta": 1277629152,
+        "septute": 125640589,
+        "tyft0n": 186157133,
+        "yellowtitan7": 303213926,
+        "noahre23": 1229366592,
+        ".pbjellyman.": 434531543
+      },
+      "roles": {
+        "saucepan14": "POC",
+        "mckielny": "Core",
+        "__meta": "Core",
+        "septute": "Core",
+        "tyft0n": "Core",
+        "yellowtitan7": "Core",
+        "noahre23": "Sub",
+        ".pbjellyman.": "Sub"
+      }
+    },
+    "Rose Syndicate": {
+      "team_id": 508,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "afterparti": 79016371,
+        "hullisucc": 1052794264,
+        "seth456": 920395157,
+        "wicca.": 112819508,
+        ".zhellsing": 1257027369,
+        ".zimmzimm": 182809828,
+        "carlsagan.": 258551037,
+        "duckfilms": 131037554
+      },
+      "roles": {
+        "afterparti": "POC",
+        "hullisucc": "Core",
+        "seth456": "Core",
+        "wicca.": "Core",
+        ".zhellsing": "Core",
+        ".zimmzimm": "Core",
+        "carlsagan.": "Sub",
+        "duckfilms": "Sub"
+      }
+    },
+    "S tier Slop": {
+      "team_id": 463,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "stinkletoot1": 993772222,
+        "arkiitheone": 290385954,
+        "cue._.": 816707275,
+        "glady_lol": 1115585068,
+        ".indwell": 158741043,
+        "itzdeadly": 438348274,
+        "firedragon278": 1523959862
+      },
+      "roles": {
+        "stinkletoot1": "POC",
+        "arkiitheone": "Core",
+        "cue._.": "Core",
+        "glady_lol": "Core",
+        ".indwell": "Core",
+        "itzdeadly": "Core",
+        "firedragon278": "Sub"
+      }
+    },
+    "SAVE MENTAL GO NEXT": {
+      "team_id": 310,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "aceclump": 184568432,
+        "._.bandit": 785908464,
+        "conjox": 341282400,
+        "kengog": 219956493,
+        "syyyyn": 757319248,
+        "x.soren": 376272229
+      },
+      "roles": {
+        "aceclump": "POC",
+        "._.bandit": "Core",
+        "conjox": "Core",
+        "kengog": "Core",
+        "syyyyn": "Core",
+        "x.soren": "Core"
+      }
+    },
+    "Schrodingers Ava": {
+      "team_id": 254,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "cowboyerik": 110161919,
+        "coolcreater8": 349126745,
+        "derktheterk": 203023684,
+        "krxpi": 1179324679,
+        "shif_less": 411652072,
+        "vandeer_": 159858279,
+        "helidon": 358980201
+      },
+      "roles": {
+        "cowboyerik": "POC",
+        "coolcreater8": "Core",
+        "derktheterk": "Core",
+        "krxpi": "Core",
+        "shif_less": "Core",
+        "vandeer_": "Core",
+        "helidon": "Sub"
+      }
+    },
+    "She Slork Me Unfathomably": {
+      "team_id": 37,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "zeni.dl": 89639343,
+        "bennet619er": 95238002,
+        ".ethanh": 91036997,
+        "jiboss": 1228934725,
+        "oxibean": 168562992,
+        "shortisaac": 1105430867,
+        "kyriosnous": 1899757810,
+        "moo2d2": 157908071
+      },
+      "roles": {
+        "zeni.dl": "POC",
+        "bennet619er": "Core",
+        ".ethanh": "Core",
+        "jiboss": "Core",
+        "oxibean": "Core",
+        "shortisaac": "Core",
+        "kyriosnous": "Sub",
+        "moo2d2": "Sub"
+      }
+    },
+    "Shiv-er Me Timbers": {
+      "team_id": 58,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "slugmart": 81622017,
+        "niaaak": 471153336,
+        "_repooc": 375714166,
+        "ruentheparty": 60868576,
+        "themagicshoe": 448796757,
+        "toccoa1": 104787023,
+        "pineconetv": 26652256,
+        "tetzio": 383656680
+      },
+      "roles": {
+        "slugmart": "POC",
+        "niaaak": "Core",
+        "_repooc": "Core",
+        "ruentheparty": "Core",
+        "themagicshoe": "Core",
+        "toccoa1": "Core",
+        "pineconetv": "Sub",
+        "tetzio": "Sub"
+      }
+    },
+    "Shrodingers Lions": {
+      "team_id": 502,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "pokepokeye": 1116849384,
+        "craftkitty": 120509375,
+        "drakeabrams": 1305735289,
+        "jekylll": 157095493,
+        "keotome": 769078693,
+        "naga208": 281226844,
+        "feauv": 387638283,
+        "squatchhunterr": 84458210
+      },
+      "roles": {
+        "pokepokeye": "POC",
+        "craftkitty": "Core",
+        "drakeabrams": "Core",
+        "jekylll": "Core",
+        "keotome": "Core",
+        "naga208": "Core",
+        "feauv": "Sub",
+        "squatchhunterr": "Sub"
+      }
+    },
+    "Sinner 6": {
+      "team_id": 184,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "argentvm": 101387753,
+        "ast.er.isk": 246148999,
+        "jah1408": 1048238119,
+        "pyxlmyx": 56372782,
+        "slitheris": 149433090,
+        "struckluck": 108631241,
+        "mr.benjipoo": 998186633,
+        "_thegambler": 251827984
+      },
+      "roles": {
+        "argentvm": "POC",
+        "ast.er.isk": "Core",
+        "jah1408": "Core",
+        "pyxlmyx": "Core",
+        "slitheris": "Core",
+        "struckluck": "Core",
+        "mr.benjipoo": "Sub",
+        "_thegambler": "Sub"
+      }
+    },
+    "Six Sevens": {
+      "team_id": 205,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "spoon_ts": 405767685,
+        "aaronmaag": 1035805054,
+        "copyz7": 483852117,
+        "pocket_pasta": 241444522,
+        "robincraft": 491100559,
+        "spinjc": 122118740,
+        "asiinema": 1155813794,
+        "lqndonz": 334857180
+      },
+      "roles": {
+        "spoon_ts": "POC",
+        "aaronmaag": "Core",
+        "copyz7": "Core",
+        "pocket_pasta": "Core",
+        "robincraft": "Core",
+        "spinjc": "Core",
+        "asiinema": "Sub",
+        "lqndonz": "Sub"
+      }
+    },
+    "SixSobans": {
+      "team_id": 374,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "doji4ever": 1275033651,
+        "ayonswaank": 1006757547,
+        "bazzcannon": 120419530,
+        "konstrikt": 409427844,
+        "savagesleeper_.": 919958054,
+        "scuzzitwoo": 922516615
+      },
+      "roles": {
+        "doji4ever": "POC",
+        "ayonswaank": "Core",
+        "bazzcannon": "Core",
+        "konstrikt": "Core",
+        "savagesleeper_.": "Core",
+        "scuzzitwoo": "Core"
+      }
+    },
+    "SlingSpellers": {
+      "team_id": 466,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "thegreatdoodles": 58934978,
+        "cygaret": 297296339,
+        "idiotdogchild": 76009144,
+        "mr_kitty42069": 1520892650,
+        "ward322": 61185367,
+        "yoshidog2005": 298860056,
+        ".wild.": 1142061362
+      },
+      "roles": {
+        "thegreatdoodles": "POC",
+        "cygaret": "Core",
+        "idiotdogchild": "Core",
+        "mr_kitty42069": "Core",
+        "ward322": "Core",
+        "yoshidog2005": "Core",
+        ".wild.": "Sub"
+      }
+    },
+    "Slorkin It": {
+      "team_id": 478,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "sillygoose5776": 1429904864,
+        "austpal": 1259829478,
+        "ferdriech": 373734763,
+        "kespada": 1686005012,
+        "mozlen": 431970826,
+        "regalinfiltrator": 343626111,
+        "gubwub": 1102782905,
+        "ptcourage": 285646364
+      },
+      "roles": {
+        "sillygoose5776": "POC",
+        "austpal": "Core",
+        "ferdriech": "Core",
+        "kespada": "Core",
+        "mozlen": "Core",
+        "regalinfiltrator": "Core",
+        "gubwub": "Sub",
+        "ptcourage": "Sub"
+      }
+    },
+    "Soul Rebirth": {
+      "team_id": 271,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "stanleytheparable": 83280713,
+        "gloatdragon": 1052230514,
+        "haloshiroe": 191306798,
+        "hunter4901": 130665618,
+        "mkrazy": 243095518,
+        "temlon": 66295646,
+        "bdogthetruth": 1095870514,
+        "z8phyr": 477958222
+      },
+      "roles": {
+        "stanleytheparable": "POC",
+        "gloatdragon": "Core",
+        "haloshiroe": "Core",
+        "hunter4901": "Core",
+        "mkrazy": "Core",
+        "temlon": "Core",
+        "bdogthetruth": "Sub",
+        "z8phyr": "Sub"
+      }
+    },
+    "Spirit Urn Here": {
+      "team_id": 44,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "aa4di": 291464604,
+        "1337belle": 170900407,
+        "coachwind": 203393341,
+        "evster1": 332862524,
+        "greatskeletor": 324279543,
+        "silver_leader": 1726167624,
+        "bezelbeats": 1266125124,
+        "cloakoak": 1224422316
+      },
+      "roles": {
+        "aa4di": "POC",
+        "1337belle": "Core",
+        "coachwind": "Core",
+        "evster1": "Core",
+        "greatskeletor": "Core",
+        "silver_leader": "Core",
+        "bezelbeats": "Sub",
+        "cloakoak": "Sub"
+      }
+    },
+    "Spirit Urn Somewhere": {
+      "team_id": 291,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "alexisoccupied": 270897076,
+        "clevrtrikr": 297461402,
+        "doffyvamp": 344332689,
+        "misty_helena": 1094247633,
+        "neosphyte": 401156450,
+        "v4.172.13": 111351747,
+        "digbert_86805": 1073220953,
+        "osirk": 1428560133
+      },
+      "roles": {
+        "alexisoccupied": "POC",
+        "clevrtrikr": "Core",
+        "doffyvamp": "Core",
+        "misty_helena": "Core",
+        "neosphyte": "Core",
+        "v4.172.13": "Core",
+        "digbert_86805": "Sub",
+        "osirk": "Sub"
+      }
+    },
+    "Spirit Urn There": {
+      "team_id": 193,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        ".mechanik": 441940366,
+        "7nix": 1140938455,
+        "dannowanno": 281695706,
+        "johnolly": 965973901,
+        "lanbedro": 117514828,
+        "tormutrose": 48228713,
+        "dannydevitobutlesscool": 160781478
+      },
+      "roles": {
+        ".mechanik": "POC",
+        "7nix": "Core",
+        "dannowanno": "Core",
+        "johnolly": "Core",
+        "lanbedro": "Core",
+        "tormutrose": "Core",
+        "dannydevitobutlesscool": "Sub"
+      }
+    },
+    "Stone Form": {
+      "team_id": 501,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "so_yea": 1461917145,
+        "epic_1142": 1263706325,
+        "laxlanders": 207499635,
+        "notcnnr.": 1134272448,
+        "stephrays": 249400785,
+        "vastsa": 307471114,
+        "j4sse.": 190403764,
+        "prxpanda": 1218711820
+      },
+      "roles": {
+        "so_yea": "POC",
+        "epic_1142": "Core",
+        "laxlanders": "Core",
+        "notcnnr.": "Core",
+        "stephrays": "Core",
+        "vastsa": "Core",
+        "j4sse.": "Sub",
+        "prxpanda": "Sub"
+      }
+    },
+    "Students of Blackmore": {
+      "team_id": 269,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "twistysasage": 165672503,
+        "alreadypro": 1821549891,
+        "atlasjames": 467989446,
+        "carcass": 194996755,
+        "eczemonk": 122758709,
+        "_justinherass": 161079748,
+        "krjunior": 95910836,
+        "xvzombo": 1018167851
+      },
+      "roles": {
+        "twistysasage": "POC",
+        "alreadypro": "Core",
+        "atlasjames": "Core",
+        "carcass": "Core",
+        "eczemonk": "Core",
+        "_justinherass": "Core",
+        "krjunior": "Sub",
+        "xvzombo": "Sub"
+      }
+    },
+    "Swap City": {
+      "team_id": 477,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "funcio_": 92356635,
+        "artur_la": 109674395,
+        "galaxyazure": 196144835,
+        ".mickk": 295902931,
+        "nkonin": 434833987,
+        "sefy666": 270544328,
+        "deerlover45": 1080344200
+      },
+      "roles": {
+        "funcio_": "POC",
+        "artur_la": "Core",
+        "galaxyazure": "Core",
+        ".mickk": "Core",
+        "nkonin": "Core",
+        "sefy666": "Core",
+        "deerlover45": "Sub"
+      }
+    },
+    "SwitchU": {
+      "team_id": 389,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "y0ted": 206141972,
+        "704_cross": 839121430,
+        "kodesu69": 427671041,
+        "orshirah": 1579614065,
+        "sketz": 367035981,
+        "surtipix": 836220851,
+        "chainsawsinjune": 765930684,
+        "paralyzedgorilla": 1099786709
+      },
+      "roles": {
+        "y0ted": "POC",
+        "704_cross": "Core",
+        "kodesu69": "Core",
+        "orshirah": "Core",
+        "sketz": "Core",
+        "surtipix": "Core",
+        "chainsawsinjune": "Sub",
+        "paralyzedgorilla": "Sub"
+      }
+    },
+    "T3 Gankers": {
+      "team_id": 249,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "sreffu": 1257098373,
+        "b1zzler": 991024586,
+        ".beesauce.": 151726840,
+        "hardlightcaster": 397992385,
+        "illogical_designer": 71310495,
+        ".therealghosty": 460556621,
+        "ehdss2232": 1050034250,
+        "fordale": 381657780
+      },
+      "roles": {
+        "sreffu": "POC",
+        "b1zzler": "Core",
+        ".beesauce.": "Core",
+        "hardlightcaster": "Core",
+        "illogical_designer": "Core",
+        ".therealghosty": "Core",
+        "ehdss2232": "Sub",
+        "fordale": "Sub"
+      }
+    },
+    "Take My Goon": {
+      "team_id": 442,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "gojoslefttoe": 1037752056,
+        "mleakie": 853508812,
+        "mxxn_tm": 181729378,
+        "orchary": 166596343,
+        "ramware": 295859462,
+        "sleepyskeh": 892125688,
+        "lightningdraws": 1042540949,
+        "ulnabayleaf": 151235862
+      },
+      "roles": {
+        "gojoslefttoe": "POC",
+        "mleakie": "Core",
+        "mxxn_tm": "Core",
+        "orchary": "Core",
+        "ramware": "Core",
+        "sleepyskeh": "Core",
+        "lightningdraws": "Sub",
+        "ulnabayleaf": "Sub"
+      }
+    },
+    "Team Abrams": {
+      "team_id": 471,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "sepiadl": 1126547764,
+        "ado_my_lover": 1016689973,
+        "cecil8347": 841573462,
+        "evil_enigma": 389425600,
+        "hanezevejoe": 406054706,
+        "yama.toes": 1007573047
+      },
+      "roles": {
+        "sepiadl": "POC",
+        "ado_my_lover": "Core",
+        "cecil8347": "Core",
+        "evil_enigma": "Core",
+        "hanezevejoe": "Core",
+        "yama.toes": "Core"
+      }
+    },
+    "Team Bebop": {
+      "team_id": 473,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "fullmetalr": 324613784,
+        "blithine": 156769168,
+        "cicollao": 110455707,
+        "duckchapstick": 216640654,
+        "ping8318": 920075236,
+        "s2ndwich": 186804397
+      },
+      "roles": {
+        "fullmetalr": "POC",
+        "blithine": "Core",
+        "cicollao": "Core",
+        "duckchapstick": "Core",
+        "ping8318": "Core",
+        "s2ndwich": "Core"
+      }
+    },
+    "Team Billy": {
+      "team_id": 474,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "hey11111": 159254008,
+        "calzone8053": 1120986782,
+        "chrissypissy.": 176063778,
+        "delirious76": 194962888,
+        "gingyy.": 202099322,
+        "pudin54": 354562468,
+        "crusaderfromfuture": 893135545,
+        "richarde": 121542950
+      },
+      "roles": {
+        "hey11111": "POC",
+        "calzone8053": "Core",
+        "chrissypissy.": "Core",
+        "delirious76": "Core",
+        "gingyy.": "Core",
+        "pudin54": "Core",
+        "crusaderfromfuture": "Sub",
+        "richarde": "Sub"
+      }
+    },
+    "Team Celeste": {
+      "team_id": 476,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "tophh._.": 71061968,
+        "corrupted2": 1739439006,
+        "gyle.": 178960500,
+        "prtzl": 181456277,
+        "trojanprince": 187839612,
+        "un4.": 186212199,
+        "gremoria": 257591945
+      },
+      "roles": {
+        "tophh._.": "POC",
+        "corrupted2": "Core",
+        "gyle.": "Core",
+        "prtzl": "Core",
+        "trojanprince": "Core",
+        "un4.": "Core",
+        "gremoria": "Sub"
+      }
+    },
+    "Team Deadchud": {
+      "team_id": 456,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "wahlee": 201566547,
+        "breather489": 362259493,
+        "deestroying": 1248341927,
+        "frooshy2": 209515378,
+        "politicianslie": 1106202694,
+        "toxicspit295": 1315102681,
+        "johnjunkrat": 1605930421,
+        "trick10": 1003877182
+      },
+      "roles": {
+        "wahlee": "POC",
+        "breather489": "Core",
+        "deestroying": "Core",
+        "frooshy2": "Core",
+        "politicianslie": "Core",
+        "toxicspit295": "Core",
+        "johnjunkrat": "Sub",
+        "trick10": "Sub"
+      }
+    },
+    "Team Evictix": {
+      "team_id": 152,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "magic.missile.247": 1609053549,
+        "astrophobe": 1053718377,
+        "bloodpetal": 44363619,
+        "noxful": 1037486555,
+        "static095762": 923146937,
+        "xoenvii": 1205076907,
+        "brooksilvers": 224860494,
+        "tupwoop": 194738964
+      },
+      "roles": {
+        "magic.missile.247": "POC",
+        "astrophobe": "Core",
+        "bloodpetal": "Core",
+        "noxful": "Core",
+        "static095762": "Core",
+        "xoenvii": "Core",
+        "brooksilvers": "Sub",
+        "tupwoop": "Sub"
+      }
+    },
+    "Team Graves": {
+      "team_id": 479,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "pholcidae.": 226514335,
+        "hcctor": 1133184630,
+        "raccoonswagger": 414613249
+      },
+      "roles": {
+        "pholcidae.": "POC",
+        "hcctor": "Core",
+        "raccoonswagger": "Core"
+      }
+    },
+    "Team Haze": {
+      "team_id": 481,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "karmabolt": 198544308,
+        "fxghost0460": 1173407618,
+        "peter1701490361": 159471545,
+        "porqueno2290": 1112325539,
+        "ragincroissant": 55043577,
+        "skeelarh": 373922303
+      },
+      "roles": {
+        "karmabolt": "POC",
+        "fxghost0460": "Core",
+        "peter1701490361": "Core",
+        "porqueno2290": "Core",
+        "ragincroissant": "Core",
+        "skeelarh": "Core"
+      }
+    },
+    "Team Holliday": {
+      "team_id": 482,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "lolz898": 103016081,
+        "akshay2961995": 206056767,
+        "havesomedoza": 126485577,
+        "libadoxon": 882352344,
+        "nsxv70": 1009008405,
+        "sonku": 112688421,
+        "astr1s": 399057013,
+        "corruptedlung": 213989757
+      },
+      "roles": {
+        "lolz898": "POC",
+        "akshay2961995": "Core",
+        "havesomedoza": "Core",
+        "libadoxon": "Core",
+        "nsxv70": "Core",
+        "sonku": "Core",
+        "astr1s": "Sub",
+        "corruptedlung": "Sub"
+      }
+    },
+    "Team Infernus": {
+      "team_id": 483,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "jonnygreasegun": 112241581,
+        "a_kotarou": 452379593,
+        "cobitar": 106619390,
+        "lixd3n": 839027808,
+        "mintyurine": 311440714,
+        "psycho_pomp": 439935672,
+        "furok": 13199759
+      },
+      "roles": {
+        "jonnygreasegun": "POC",
+        "a_kotarou": "Core",
+        "cobitar": "Core",
+        "lixd3n": "Core",
+        "mintyurine": "Core",
+        "psycho_pomp": "Core",
+        "furok": "Sub"
+      }
+    },
+    "Team Ivy": {
+      "team_id": 484,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "eastvsthewrld": 1474212983,
+        "eggsoverbreezy": 276274070,
+        "emohteetee": 260069077,
+        "nocpat": 67611094,
+        "pickle_wizard": 166308806,
+        "pyroxxxy": 1016592429
+      },
+      "roles": {
+        "eastvsthewrld": "POC",
+        "eggsoverbreezy": "Core",
+        "emohteetee": "Core",
+        "nocpat": "Core",
+        "pickle_wizard": "Core",
+        "pyroxxxy": "Core"
+      }
+    },
+    "Team Lady Geist": {
+      "team_id": 486,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "brabb6969": 92915206,
+        "eddy0725.": 1108729489,
+        "fetinex": 1053094101,
+        "goodeffort": 84083215,
+        "sirbluebox": 470954472,
+        "vadela": 102275802
+      },
+      "roles": {
+        "brabb6969": "POC",
+        "eddy0725.": "Core",
+        "fetinex": "Core",
+        "goodeffort": "Core",
+        "sirbluebox": "Core",
+        "vadela": "Core"
+      }
+    },
+    "Team Lash": {
+      "team_id": 487,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "celestialuwu._": 1075635887,
+        "elucask": 462550021,
+        "heaven2285": 95412960,
+        "nobleknights": 276889812,
+        "quartersize": 193339311,
+        "tch.": 1263777382
+      },
+      "roles": {
+        "celestialuwu._": "POC",
+        "elucask": "Core",
+        "heaven2285": "Core",
+        "nobleknights": "Core",
+        "quartersize": "Core",
+        "tch.": "Core"
+      }
+    },
+    "Team Mirage": {
+      "team_id": 490,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "pie_hero": 12006988,
+        "ardirex21": 292389092,
+        "domo7": 82799160,
+        "noobjello1": 226928711,
+        "scoutamass": 452472280,
+        "trinitussancti": 1018985689,
+        "attributions": 232080935
+      },
+      "roles": {
+        "pie_hero": "POC",
+        "ardirex21": "Core",
+        "domo7": "Core",
+        "noobjello1": "Core",
+        "scoutamass": "Core",
+        "trinitussancti": "Core",
+        "attributions": "Sub"
+      }
+    },
+    "Team Paige": {
+      "team_id": 491,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "adamgomera123": 1148748035,
+        "alkoholisticr": 385602277,
+        "meh5664": 312327493,
+        "oimlate": 255619787,
+        ".solss.": 1095260033,
+        "thatguy9761": 1036383037,
+        "keene_z8888": 1424124988,
+        "manofneutral": 957818784
+      },
+      "roles": {
+        "adamgomera123": "POC",
+        "alkoholisticr": "Core",
+        "meh5664": "Core",
+        "oimlate": "Core",
+        ".solss.": "Core",
+        "thatguy9761": "Core",
+        "keene_z8888": "Sub",
+        "manofneutral": "Sub"
+      }
+    },
+    "Team Paradox": {
+      "team_id": 492,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "quetzalcoatls_son": 884837756,
+        "ashai_": 368704464,
+        "brotherdawgman": 179593697,
+        "coolturtle51": 1560039887,
+        "stephanosrex": 39903691,
+        "zimbly": 877468413
+      },
+      "roles": {
+        "quetzalcoatls_son": "POC",
+        "ashai_": "Core",
+        "brotherdawgman": "Core",
+        "coolturtle51": "Core",
+        "stephanosrex": "Core",
+        "zimbly": "Core"
+      }
+    },
+    "Team Pocket": {
+      "team_id": 493,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "thepullenator": 228583847,
+        "lord_h16": 234797922,
+        "octova": 1052633299,
+        "skowner98": 1233075240,
+        "varnuk": 1131841955,
+        "yindori": 88199535,
+        "kyuenq1": 1336201758
+      },
+      "roles": {
+        "thepullenator": "POC",
+        "lord_h16": "Core",
+        "octova": "Core",
+        "skowner98": "Core",
+        "varnuk": "Core",
+        "yindori": "Core",
+        "kyuenq1": "Sub"
+      }
+    },
+    "Team Rem": {
+      "team_id": 494,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "dynoswar": 1027979347,
+        "bucketsus": 326000096,
+        "cyreal.": 146326756,
+        "ecniray_gamer": 105650659,
+        "eeecee": 126573521,
+        "erkahysterica": 439275424,
+        "superpolarbrrr": 165284155
+      },
+      "roles": {
+        "dynoswar": "POC",
+        "bucketsus": "Core",
+        "cyreal.": "Core",
+        "ecniray_gamer": "Core",
+        "eeecee": "Core",
+        "erkahysterica": "Core",
+        "superpolarbrrr": "Core"
+      }
+    },
+    "Team Swampers vG": {
+      "team_id": 365,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "sxgern.": 1530727373,
+        "blakey004": 1052226158,
+        "jiovalor": 1105186194,
+        "kylen6": 427668857,
+        "osrsinferi": 1437524640,
+        ".z.z.": 1886142691,
+        "paeches": 41736499,
+        "sunday_kills": 277715022
+      },
+      "roles": {
+        "sxgern.": "POC",
+        "blakey004": "Core",
+        "jiovalor": "Core",
+        "kylen6": "Core",
+        "osrsinferi": "Core",
+        ".z.z.": "Core",
+        "paeches": "Sub",
+        "sunday_kills": "Sub"
+      }
+    },
+    "Team Victor": {
+      "team_id": 500,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "jessithebessi": 409533098,
+        "artdelacreaux": 109122336,
+        "asinus": 911598780,
+        "_isolate": 1038107195,
+        "kaldrin.": 1357767509,
+        "theregalia115": 1299868686
+      },
+      "roles": {
+        "jessithebessi": "POC",
+        "artdelacreaux": "Core",
+        "asinus": "Core",
+        "_isolate": "Core",
+        "kaldrin.": "Core",
+        "theregalia115": "Core"
+      }
+    },
+    "Tempers": {
+      "team_id": 347,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "dead2525": 838887748,
+        "a_silly_little_guy": 1106520741,
+        "glublet": 133613692,
+        "loiters": 463490654,
+        "papo0943": 160175149,
+        "snackiesianc": 213623955,
+        "expirednuts": 251471027,
+        "zpunda": 847612567
+      },
+      "roles": {
+        "dead2525": "POC",
+        "a_silly_little_guy": "Core",
+        "glublet": "Core",
+        "loiters": "Core",
+        "papo0943": "Core",
+        "snackiesianc": "Core",
+        "expirednuts": "Sub",
+        "zpunda": "Sub"
+      }
+    },
+    "The Androids": {
+      "team_id": 198,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "momsspaghett": 260299909,
+        ".aimassist": 161542973,
+        "fennekku": 200251662,
+        "lowjet": 884260993,
+        "pand1244": 1224212376,
+        "yappae": 1136700992,
+        "iamoreooo": 1126748617,
+        "naratheweirdo": 1123790284
+      },
+      "roles": {
+        "momsspaghett": "POC",
+        ".aimassist": "Core",
+        "fennekku": "Core",
+        "lowjet": "Core",
+        "pand1244": "Core",
+        "yappae": "Core",
+        "iamoreooo": "Sub",
+        "naratheweirdo": "Sub"
+      }
+    },
+    "The Baltimore Blasters": {
+      "team_id": 505,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "ekkonomical": 88313670,
+        "2ndendsky": 1124182683,
+        "arealjester": 904701015,
+        "colteor": 129817507,
+        "jampuppy5": 137431842,
+        "tomboytoucher": 124090769,
+        "alice3144": 877029797
+      },
+      "roles": {
+        "ekkonomical": "POC",
+        "2ndendsky": "Core",
+        "arealjester": "Core",
+        "colteor": "Core",
+        "jampuppy5": "Core",
+        "tomboytoucher": "Core",
+        "alice3144": "Sub"
+      }
+    },
+    "The Baroness Bellhops": {
+      "team_id": 450,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "_honko_": 839429596,
+        "7teen1717": 896580642,
+        ".angu1sh.": 839049462,
+        "bizarreow": 369671280,
+        "genevievexo": 181575164,
+        "spencer95": 53648347,
+        "thewatchmen1985": 120068658
+      },
+      "roles": {
+        "_honko_": "POC",
+        "7teen1717": "Core",
+        ".angu1sh.": "Core",
+        "bizarreow": "Core",
+        "genevievexo": "Core",
+        "spencer95": "Core",
+        "thewatchmen1985": "Sub"
+      }
+    },
+    "The Bax Street Boys": {
+      "team_id": 451,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "bhrpsalot": 1141890061,
+        "halestorm8586": 1547802682,
+        "mattzzx": 1069635671,
+        "mothman._69": 1790312911,
+        "nekrowze": 109063511,
+        "sarfinator": 127176492,
+        "colalada": 1127114736,
+        "kitkatemerald": 1015377491
+      },
+      "roles": {
+        "bhrpsalot": "POC",
+        "halestorm8586": "Core",
+        "mattzzx": "Core",
+        "mothman._69": "Core",
+        "nekrowze": "Core",
+        "sarfinator": "Core",
+        "colalada": "Sub",
+        "kitkatemerald": "Sub"
+      }
+    },
+    "The Bebop BackDoor": {
+      "team_id": 154,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "bonkfever": 57790497,
+        "chadwellington.": 1113347980,
+        "didyutaka": 1224862848,
+        "mukokvasselle": 58625218,
+        "revnon": 42213308,
+        "zeth1522": 286889438,
+        "kasnune": 138474678,
+        "p2mg": 1859346140
+      },
+      "roles": {
+        "bonkfever": "POC",
+        "chadwellington.": "Core",
+        "didyutaka": "Core",
+        "mukokvasselle": "Core",
+        "revnon": "Core",
+        "zeth1522": "Core",
+        "kasnune": "Sub",
+        "p2mg": "Sub"
+      }
+    },
+    "The Best Friends Ship": {
+      "team_id": 495,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "_thecouncil": 1113031575,
+        "froothoops": 82373337,
+        "metalityw": 1612307332,
+        "saltysparks": 341144841,
+        "scarrowfell": 1240893712
+      },
+      "roles": {
+        "_thecouncil": "POC",
+        "froothoops": "Core",
+        "metalityw": "Core",
+        "saltysparks": "Core",
+        "scarrowfell": "Core"
+      }
+    },
+    "The Corner Campers": {
+      "team_id": 148,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "narktheshark": 39449040,
+        "averagegravityfan": 1034509780,
+        "cloyste.r.": 1270470095,
+        "jeff1235748650": 1689774396,
+        "polmoz": 98045948,
+        "chubbyfinns": 110879844
+      },
+      "roles": {
+        "narktheshark": "POC",
+        "averagegravityfan": "Core",
+        "cloyste.r.": "Core",
+        "jeff1235748650": "Core",
+        "polmoz": "Core",
+        "chubbyfinns": "Sub"
+      }
+    },
+    "The Cursed Apple Deli": {
+      "team_id": 370,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "drxgyn": 880934744,
+        "blue_flarez": 1170456491,
+        "dead___": 125370510,
+        "koyosomi": 1038680099,
+        "lgcfsh": 1045363190,
+        "woloo2": 1116402522,
+        "eee3x": 881972812,
+        "torbjorn3360": 1106274620
+      },
+      "roles": {
+        "drxgyn": "POC",
+        "blue_flarez": "Core",
+        "dead___": "Core",
+        "koyosomi": "Core",
+        "lgcfsh": "Core",
+        "woloo2": "Core",
+        "eee3x": "Sub",
+        "torbjorn3360": "Sub"
+      }
+    },
+    "The Cursed Bapple": {
+      "team_id": 437,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "pohkes": 1271141929,
+        "bubblrr": 365930502,
+        "kosunu": 1078341784,
+        "littlelemm": 340581808,
+        "tumorbaby": 847707926,
+        "wauls.": 315063404
+      },
+      "roles": {
+        "pohkes": "POC",
+        "bubblrr": "Core",
+        "kosunu": "Core",
+        "littlelemm": "Core",
+        "tumorbaby": "Core",
+        "wauls.": "Core"
+      }
+    },
+    "The House Atlantic": {
+      "team_id": 119,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "vaxis_": 1181123208,
+        "awoogavibez": 381456147,
+        "hsojm": 183203266,
+        "l0c4l": 1919576534,
+        "oryx77777": 246953203,
+        "psychojoker": 124249807,
+        "lawnflamingottv": 202782548,
+        "woopbut": 255700488
+      },
+      "roles": {
+        "vaxis_": "POC",
+        "awoogavibez": "Core",
+        "hsojm": "Core",
+        "l0c4l": "Core",
+        "oryx77777": "Core",
+        "psychojoker": "Core",
+        "lawnflamingottv": "Sub",
+        "woopbut": "Sub"
+      }
+    },
+    "THE KLUDGELERS": {
+      "team_id": 440,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        ".billxfrank": 1597431769,
+        "derpinic.": 444431254,
+        "fortboy2025": 1247187218,
+        "i_be_pro_fun": 401689132,
+        ".lemod": 1558483221,
+        "neuroplastea": 251586201,
+        "sarryon": 1069257489,
+        "zoolz": 199703226
+      },
+      "roles": {
+        ".billxfrank": "POC",
+        "derpinic.": "Core",
+        "fortboy2025": "Core",
+        "i_be_pro_fun": "Core",
+        ".lemod": "Core",
+        "neuroplastea": "Core",
+        "sarryon": "Sub",
+        "zoolz": "Sub"
+      }
+    },
+    "The Lash Shaker": {
+      "team_id": 489,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "spacecadetky": 343097686,
+        "beepbep101": 95356429,
+        "hisoka8165": 1860633329,
+        "j1ffrey": 55915864,
+        "snorfer": 347244047,
+        "tannerderg": 208695321,
+        "mannyeb": 242227660
+      },
+      "roles": {
+        "spacecadetky": "POC",
+        "beepbep101": "Core",
+        "hisoka8165": "Core",
+        "j1ffrey": "Core",
+        "snorfer": "Core",
+        "tannerderg": "Core",
+        "mannyeb": "Sub"
+      }
+    },
+    "The Lightning": {
+      "team_id": 289,
+      "division": "DSL 5 - Premier",
+      "region": "",
+      "players": {
+        "pluto0g": 95120887,
+        "anthonyqtran": 107607743,
+        "autumn3972": 205034988,
+        "dadwarf45": 356027483,
+        "lawful1": 1482256924,
+        "neverbengood": 221416238,
+        "pizzapie_na1": 157877841,
+        "zanatons": 69678309
+      },
+      "roles": {
+        "pluto0g": "POC",
+        "anthonyqtran": "Core",
+        "autumn3972": "Core",
+        "dadwarf45": "Core",
+        "lawful1": "Core",
+        "neverbengood": "Core",
+        "pizzapie_na1": "Sub",
+        "zanatons": "Sub"
+      }
+    },
+    "The Lochyyy": {
+      "team_id": 335,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "ilikepizza107": 1095392329,
+        "ajay34": 81600091,
+        "golfbum7": 145508119,
+        "naomi2963": 126969998,
+        "puunk_": 87430806,
+        "skaai.": 392295756,
+        "angrytsunami": 82302172,
+        "kaotic_villa": 186690871
+      },
+      "roles": {
+        "ilikepizza107": "POC",
+        "ajay34": "Core",
+        "golfbum7": "Core",
+        "naomi2963": "Core",
+        "puunk_": "Core",
+        "skaai.": "Core",
+        "angrytsunami": "Sub",
+        "kaotic_villa": "Sub"
+      }
+    },
+    "The Revenants": {
+      "team_id": 453,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "twosofly": 1444622691,
+        "eton2103": 1349677372,
+        "kingroches": 187654127,
+        "kit_kitkat": 1053052593,
+        "magikfs": 883228159,
+        "mutchputch": 437742369,
+        "anjiin": 47683213,
+        "sleep6822": 1047064612
+      },
+      "roles": {
+        "twosofly": "POC",
+        "eton2103": "Core",
+        "kingroches": "Core",
+        "kit_kitkat": "Core",
+        "magikfs": "Core",
+        "mutchputch": "Core",
+        "anjiin": "Sub",
+        "sleep6822": "Sub"
+      }
+    },
+    "The Shopkeepers": {
+      "team_id": 361,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "facq": 116287954,
+        "4krn": 1121712501,
+        "alfie_yo": 410404842,
+        "doombro3752": 878636796,
+        "happychappysnappyserape": 55354217,
+        "heftybug": 315521744,
+        "alexsohn": 58081282,
+        "zeroloyalty": 888941320
+      },
+      "roles": {
+        "facq": "POC",
+        "4krn": "Core",
+        "alfie_yo": "Core",
+        "doombro3752": "Core",
+        "happychappysnappyserape": "Core",
+        "heftybug": "Core",
+        "alexsohn": "Sub",
+        "zeroloyalty": "Sub"
+      }
+    },
+    "The SpellSlingers": {
+      "team_id": 38,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        ".noah284": 392527082,
+        "chuckv107": 278586714,
+        "keriacat": 882354016,
+        "penguinfps.": 1160919240,
+        "surubi": 144811783,
+        "whowins": 351109503,
+        ".eve_break": 1721244640
+      },
+      "roles": {
+        ".noah284": "POC",
+        "chuckv107": "Core",
+        "keriacat": "Core",
+        "penguinfps.": "Core",
+        "surubi": "Core",
+        "whowins": "Core",
+        ".eve_break": "Sub"
+      }
+    },
+    "Thinking Outside the Box Run": {
+      "team_id": 448,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "crabapple720": 125795871,
+        "flow7511": 1200612121,
+        "j8stin": 174752096,
+        "orngjuice": 190806284,
+        "stealthninja9900": 885422363,
+        "z4yaan": 993182574,
+        "azarath.": 161152685
+      },
+      "roles": {
+        "crabapple720": "POC",
+        "flow7511": "Core",
+        "j8stin": "Core",
+        "orngjuice": "Core",
+        "stealthninja9900": "Core",
+        "z4yaan": "Core",
+        "azarath.": "Sub"
+      }
+    },
+    "Trophy Collectors": {
+      "team_id": 329,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "dalinar": 221432061,
+        "dunk.cs": 155033699,
+        "embrazed": 147754141,
+        "hepackin": 1016878625,
+        "jagexi": 141444875,
+        "shin_ashe": 123020420,
+        "xenzywenzy": 245253147
+      },
+      "roles": {
+        "dalinar": "POC",
+        "dunk.cs": "Core",
+        "embrazed": "Core",
+        "hepackin": "Core",
+        "jagexi": "Core",
+        "shin_ashe": "Core",
+        "xenzywenzy": "Sub"
+      }
+    },
+    "UDT": {
+      "team_id": 398,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "sayto_lol": 273520836,
+        "keylimelemonpie": 1051821664,
+        "kisunekitsune": 1408712279,
+        "nateboi2": 218738413,
+        "noyuh.": 757055018,
+        "._.pestilence._.13": 1134611979
+      },
+      "roles": {
+        "sayto_lol": "POC",
+        "keylimelemonpie": "Core",
+        "kisunekitsune": "Core",
+        "nateboi2": "Core",
+        "noyuh.": "Core",
+        "._.pestilence._.13": "Core"
+      }
+    },
+    "University of Kentucky Deadlock": {
+      "team_id": 503,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "sliccnicc": 293285634,
+        "benzen_the_viber": 1077103789,
+        "chainsawman6366": 1255762713,
+        "itxbenji": 1053915362,
+        "macco10": 1607757273,
+        "pweacher": 191936710,
+        "dmaerx": 1279636933,
+        "dunnerbird": 392746979
+      },
+      "roles": {
+        "sliccnicc": "POC",
+        "benzen_the_viber": "Core",
+        "chainsawman6366": "Core",
+        "itxbenji": "Core",
+        "macco10": "Core",
+        "pweacher": "Core",
+        "dmaerx": "Sub",
+        "dunnerbird": "Sub"
+      }
+    },
+    "University of Toronto": {
+      "team_id": 457,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "jonnywithnoh": 247514488,
+        "aspectow1": 140197025,
+        "dreamlion333": 316466842,
+        "_misclicked": 297811472,
+        "_phractal_": 1005632421,
+        "snowbreath89": 151508316,
+        "seaborn": 217452415
+      },
+      "roles": {
+        "jonnywithnoh": "POC",
+        "aspectow1": "Core",
+        "dreamlion333": "Core",
+        "_misclicked": "Core",
+        "_phractal_": "Core",
+        "snowbreath89": "Core",
+        "seaborn": "Sub"
+      }
+    },
+    "Unstoppable": {
+      "team_id": 268,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "synergy.exe": 488237465,
+        "2bular": 183950862,
+        "jefferz24": 347988671,
+        "laughing5653": 1043917183,
+        "pikamaster_": 1106161489,
+        "wokar": 406885314,
+        "1_fire__": 72355882,
+        "ilblizz": 886104173
+      },
+      "roles": {
+        "synergy.exe": "POC",
+        "2bular": "Core",
+        "jefferz24": "Core",
+        "laughing5653": "Core",
+        "pikamaster_": "Core",
+        "wokar": "Core",
+        "1_fire__": "Sub",
+        "ilblizz": "Sub"
+      }
+    },
+    "Visionary": {
+      "team_id": 203,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "shadowvisions": 115528636,
+        "4x4r4": 242554137,
+        "full_bot": 300836969,
+        "sol.xyz": 176023037,
+        "sunnyvisions": 129609300,
+        "thepyroham": 333903326,
+        "eternal_hawk": 173806204,
+        "reddokuin_": 1767240376
+      },
+      "roles": {
+        "shadowvisions": "POC",
+        "4x4r4": "Core",
+        "full_bot": "Core",
+        "sol.xyz": "Core",
+        "sunnyvisions": "Core",
+        "thepyroham": "Core",
+        "eternal_hawk": "Sub",
+        "reddokuin_": "Sub"
+      }
+    },
+    "W Urn": {
+      "team_id": 406,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "koko2.0": 902091923,
+        "dmninc": 260253791,
+        "flucxs": 411490221,
+        "gaybelli": 136671530,
+        "wurzap": 177863925,
+        "yukineshizuku": 373815745,
+        "katynish": 399699738
+      },
+      "roles": {
+        "koko2.0": "POC",
+        "dmninc": "Core",
+        "flucxs": "Core",
+        "gaybelli": "Core",
+        "wurzap": "Core",
+        "yukineshizuku": "Core",
+        "katynish": "Sub"
+      }
+    },
+    "We Are Deadlock": {
+      "team_id": 469,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "jazzy6974": 1097297900,
+        "haie.": 324253282,
+        "junohttps": 1425312021,
+        "nymphia_.": 913509949,
+        "rot4clout": 232028653,
+        "soraxi": 1259178883,
+        "el0i": 928379097,
+        "weatherqwq": 321595276
+      },
+      "roles": {
+        "jazzy6974": "POC",
+        "haie.": "Core",
+        "junohttps": "Core",
+        "nymphia_.": "Core",
+        "rot4clout": "Core",
+        "soraxi": "Core",
+        "el0i": "Sub",
+        "weatherqwq": "Sub"
+      }
+    },
+    "wE Do LoTs oF tHinGs": {
+      "team_id": 423,
+      "division": "DSL 5 - Div 3",
+      "region": "",
+      "players": {
+        "asianguykai": 334670282,
+        "backtonormal": 336241753,
+        "bobtaco4320": 1160714258,
+        "cheesypizza": 341914310,
+        "lazy.": 394724697,
+        "mat9998": 1018389219
+      },
+      "roles": {
+        "asianguykai": "POC",
+        "backtonormal": "Core",
+        "bobtaco4320": "Core",
+        "cheesypizza": "Core",
+        "lazy.": "Core",
+        "mat9998": "Core"
+      }
+    },
+    "We'll Deal with the Troopers": {
+      "team_id": 48,
+      "division": "DSL 5 - Div 1",
+      "region": "",
+      "players": {
+        "captainplanetwithmetalarms": 91900375,
+        "7evenbit4es": 111272965,
+        "genricusername": 1043086248,
+        "la_furette": 1442963038,
+        "pengus.khan": 164684147,
+        "wholovesdean": 117639073,
+        "rookie0006": 123887927,
+        "the0dds": 906990922
+      },
+      "roles": {
+        "captainplanetwithmetalarms": "POC",
+        "7evenbit4es": "Core",
+        "genricusername": "Core",
+        "la_furette": "Core",
+        "pengus.khan": "Core",
+        "wholovesdean": "Core",
+        "rookie0006": "Sub",
+        "the0dds": "Sub"
+      }
+    },
+    "What the Hex": {
+      "team_id": 83,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "deatharcher": 436034322,
+        "creativelygarbled": 179279819,
+        "forgedfalcon": 434078235,
+        "masta_beef": 230650757,
+        "tinynick1610": 157286182,
+        "trikslyr": 79675043,
+        "dumb_fat_ugly": 404788626,
+        "spaceman_exe_": 163378352
+      },
+      "roles": {
+        "deatharcher": "POC",
+        "creativelygarbled": "Core",
+        "forgedfalcon": "Core",
+        "masta_beef": "Core",
+        "tinynick1610": "Core",
+        "trikslyr": "Core",
+        "dumb_fat_ugly": "Sub",
+        "spaceman_exe_": "Sub"
+      }
+    },
+    "WubbleTub": {
+      "team_id": 321,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "joshiejs": 398840734,
+        "dooklestookle": 134358830,
+        "gubblewub": 180981095,
+        "highmoogen": 98131678,
+        "jeremyb11": 174853222,
+        "vivalaotto": 86538419
+      },
+      "roles": {
+        "joshiejs": "POC",
+        "dooklestookle": "Core",
+        "gubblewub": "Core",
+        "highmoogen": "Core",
+        "jeremyb11": "Core",
+        "vivalaotto": "Core"
+      }
+    },
+    "Yearn for Urn": {
+      "team_id": 242,
+      "division": "DSL 5 - Div 2",
+      "region": "",
+      "players": {
+        "kodaxko": 1163932871,
+        "baldoomw": 119594711,
+        "chiefrocajr": 1055701384,
+        "keko29ftw": 145548707,
+        "nilak52": 1266984653,
+        "thegreatboofening": 108948918,
+        "ninjaremover": 405675863,
+        "seanbomb": 247949379
+      },
+      "roles": {
+        "kodaxko": "POC",
+        "baldoomw": "Core",
+        "chiefrocajr": "Core",
+        "keko29ftw": "Core",
+        "nilak52": "Core",
+        "thegreatboofening": "Core",
+        "ninjaremover": "Sub",
+        "seanbomb": "Sub"
+      }
+    }
+  }
+}
