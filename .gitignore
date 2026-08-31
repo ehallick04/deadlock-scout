@@ -5,3 +5,5 @@ heroes.json
 *.csv
 ids.txt
 Ids.txt
+.agents/
+.claude/
