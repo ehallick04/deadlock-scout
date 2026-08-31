@@ -15,54 +15,86 @@ import pandas as pd
 import streamlit as st
 
 from deadlock import (
-    DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE, WITH_CUSTOMS,
-    build_report, flatten, parse_ids,
+    CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
+    WITH_CUSTOMS, build_report, flatten, hero_totals, parse_ids,
 )
+from teams import TEAMS, choices, roster
 
 st.set_page_config(page_title="Deadlock Scout", page_icon="🔒", layout="wide")
 
 MATCH_MODES = [
-    "ranked,unranked",
-    "ranked,unranked,private_lobby",
     "private_lobby",
+    "ranked,unranked,private_lobby",
+    "ranked,unranked",
     "ranked",
     "unranked",
     "coop_bot",
 ]
 
+CUSTOM_ENTRY = "Custom — paste IDs"
 
-# Cache results so re-sorting a table doesn't re-hit the API.
-# The key is the arguments, so changing any input triggers a fresh pull.
+
 @st.cache_data(ttl=900, show_spinner=False)
-def load(ids_tuple, days, top, match_mode, game_mode):
+def load(ids_tuple, days, top, match_mode, game_mode, labels_tuple):
+    """Cached so re-sorting a table doesn't re-hit the API."""
+    labels = {k: v for k, v in labels_tuple}
     return build_report(list(ids_tuple), days=days, top=top,
-                        match_mode=match_mode, game_mode=game_mode)
+                        match_mode=match_mode, game_mode=game_mode,
+                        labels=labels)
+
+
+def whole_number(text, fallback, label, minimum=1, maximum=3650):
+    """Read a typed number, falling back with a warning instead of crashing."""
+    text = (text or "").strip()
+    if not text:
+        return fallback
+    if not text.isdigit() or not minimum <= int(text) <= maximum:
+        st.sidebar.warning(f"{label}: enter a number {minimum}–{maximum}. "
+                           f"Using {fallback}.")
+        return fallback
+    return int(text)
 
 
 # --------------------------------------------------------------- sidebar
 
-st.sidebar.header("Players")
-raw = st.sidebar.text_area(
-    "Account IDs or statlocker URLs",
-    height=160,
-    placeholder="880934744\nhttps://statlocker.gg/profile/1170456491/matches",
-    help="One per line. Full profile URLs work — the id gets pulled out.",
+st.sidebar.header("Who")
+
+preset = st.sidebar.selectbox(
+    "Roster",
+    [CUSTOM_ENTRY, *choices()],
+    help="Pros presets pull custom-lobby games, where teams scrim.",
 )
 
-uploaded = st.sidebar.file_uploader("...or upload a list", type=["txt", "csv"])
-if uploaded is not None:
-    raw = (raw or "") + "\n" + uploaded.getvalue().decode("utf-8", errors="replace")
+labels = {}
+if preset == CUSTOM_ENTRY:
+    raw = st.sidebar.text_area(
+        "Account IDs, friend codes, or statlocker URLs",
+        height=150,
+        placeholder="880934744\nhttps://statlocker.gg/profile/1170456491/matches",
+        help="One per line. Steam friend codes work directly.",
+    )
+    uploaded = st.sidebar.file_uploader("...or upload a list", type=["txt", "csv"])
+    if uploaded is not None:
+        raw = (raw or "") + "\n" + uploaded.getvalue().decode("utf-8", errors="replace")
+    ids = parse_ids((raw or "").replace(",", " ").split())
+    default_mode = WITH_CUSTOMS
+else:
+    ids, labels = roster(preset)
+    st.sidebar.success(f"{preset}: {len(ids)} players")
+    default_mode = CUSTOMS_ONLY
 
 st.sidebar.header("Filters")
-days = st.sidebar.slider("Days to look back", 7, 180, 30, step=7)
-top = st.sidebar.slider("Heroes per player", 3, 15, 5)
 
-include_customs = st.sidebar.checkbox("Include custom games", value=True)
+days = whole_number(
+    st.sidebar.text_input("Days to look back", value=str(DEFAULT_DAYS)),
+    DEFAULT_DAYS, "Days")
+
+top = whole_number(
+    st.sidebar.text_input("Heroes per player", value="5"),
+    5, "Heroes per player", minimum=1, maximum=50)
+
 match_mode = st.sidebar.selectbox(
-    "Match mode",
-    MATCH_MODES,
-    index=MATCH_MODES.index(WITH_CUSTOMS if include_customs else DEFAULT_MATCH_MODE),
-)
+    "Match mode", MATCH_MODES, index=MATCH_MODES.index(default_mode))
 game_mode = st.sidebar.selectbox("Game mode", ["normal", "street_brawl"], index=0)
 
 run = st.sidebar.button("Build report", type="primary", use_container_width=True)
@@ -73,37 +105,37 @@ run = st.sidebar.button("Build report", type="primary", use_container_width=True
 st.title("Deadlock Scouting Report")
 st.caption("Most-played heroes, win rates, and ranks — from the community Deadlock API.")
 
-ids = parse_ids((raw or "").replace(",", " ").split())
-
 if not ids:
-    st.info("Paste player IDs or statlocker profile URLs in the sidebar to begin.")
+    st.info("Pick a roster, or paste player IDs in the sidebar to begin.")
     st.stop()
 
-st.write(f"**{len(ids)} player(s)** · last {days} days · `{match_mode}` · `{game_mode}`")
-
-if not run and "players" not in st.session_state:
-    st.stop()
+st.write(f"**{preset}** · {len(ids)} player(s) · last {days} days · "
+         f"`{match_mode}` · `{game_mode}`")
 
 if run:
     with st.spinner(f"Pulling data for {len(ids)} player(s)..."):
         try:
-            st.session_state.players = load(tuple(ids), days, top, match_mode, game_mode)
-            st.session_state.meta = (days, match_mode, game_mode)
+            st.session_state.players = load(
+                tuple(ids), days, top, match_mode, game_mode,
+                tuple(sorted((k, tuple(sorted(v.items()))) for k, v in labels.items())),
+            )
         except Exception as e:
             st.error(f"Could not reach the Deadlock API: {e}")
             st.stop()
 
-players = st.session_state.get("players", [])
+if "players" not in st.session_state:
+    st.stop()
+
+players = st.session_state.players
 rows = flatten(players)
 
 if not rows:
-    st.warning("No matches found for these players in this window. "
-               "Try a longer time window, or a different match mode.")
+    st.warning("No matches found in this window. Try more days, "
+               "or a different match mode.")
     st.stop()
 
 df = pd.DataFrame(rows)
 
-# ---- summary numbers
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Players", df["account_id"].nunique())
 c2.metric("Matches", int(df["matches"].sum()))
@@ -111,58 +143,82 @@ c3.metric("Distinct heroes", df["hero"].nunique())
 c4.metric("Overall win rate",
           f"{df['wins'].sum() / df['matches'].sum() * 100:.1f}%")
 
-tab_players, tab_heroes, tab_data = st.tabs(["By player", "By hero", "Raw data"])
+WINRATE_COL = st.column_config.ProgressColumn(
+    "Win rate", format="%.1f%%", min_value=0, max_value=100)
 
-# ---- per player
-with tab_players:
-    for p in players:
-        name = p.get("persona_name") or f"Account {p['account_id']}"
-        header = f"**{name}** — {p['rank_label']} · {p['total_matches']} matches"
-        with st.expander(header, expanded=len(players) <= 4):
-            if not p["heroes"]:
-                st.write("No matches in this window.")
-                continue
-            st.dataframe(
-                pd.DataFrame(p["heroes"])[["hero", "matches", "wins", "win_rate"]],
-                hide_index=True,
-                use_container_width=True,
-                column_config={
-                    "hero": "Hero",
-                    "matches": st.column_config.NumberColumn("Played"),
-                    "wins": st.column_config.NumberColumn("Wins"),
-                    "win_rate": st.column_config.ProgressColumn(
-                        "Win rate", format="%.1f%%", min_value=0, max_value=100),
-                },
-            )
+tab_hero, tab_player, tab_team, tab_data = st.tabs(
+    ["By hero", "By player", "By team", "Raw data"])
 
-# ---- aggregated across everyone
-with tab_heroes:
-    agg = (df.groupby("hero", as_index=False)
-             .agg(players=("account_id", "nunique"),
-                  matches=("matches", "sum"),
-                  wins=("wins", "sum")))
-    agg["win_rate"] = (agg["wins"] / agg["matches"] * 100).round(1)
-    agg = agg.sort_values("matches", ascending=False)
-
-    st.caption("Every hero in the group's top picks, pooled.")
+# ---- pooled hero win rates
+with tab_hero:
+    st.caption("Every hero in the group's top picks, pooled across players.")
+    totals = pd.DataFrame(hero_totals(players))
     st.dataframe(
-        agg, hide_index=True, use_container_width=True,
+        totals, hide_index=True, use_container_width=True,
         column_config={
             "hero": "Hero",
             "players": st.column_config.NumberColumn("Players"),
             "matches": st.column_config.NumberColumn("Played"),
             "wins": st.column_config.NumberColumn("Wins"),
-            "win_rate": st.column_config.ProgressColumn(
-                "Win rate", format="%.1f%%", min_value=0, max_value=100),
+            "win_rate": WINRATE_COL,
         },
     )
+
+# ---- per player
+with tab_player:
+    for p in players:
+        who = p.get("ign") or p.get("persona_name") or f"Account {p['account_id']}"
+        team = f" · {p['team']}" if p.get("team") else ""
+        header = f"**{who}**{team} — {p['rank_label']} · {p['total_matches']} matches"
+        with st.expander(header, expanded=len(players) <= 6):
+            if not p["heroes"]:
+                st.write("No matches in this window.")
+                continue
+            st.dataframe(
+                pd.DataFrame(p["heroes"])[["hero", "matches", "wins", "win_rate"]],
+                hide_index=True, use_container_width=True,
+                column_config={
+                    "hero": "Hero",
+                    "matches": st.column_config.NumberColumn("Played"),
+                    "wins": st.column_config.NumberColumn("Wins"),
+                    "win_rate": WINRATE_COL,
+                },
+            )
+
+# ---- per team
+with tab_team:
+    if not df["team"].astype(str).str.strip().any():
+        st.info("Pick a Pros roster to see team breakdowns.")
+    else:
+        for team in [t for t in df["team"].unique() if t]:
+            sub = df[df["team"] == team]
+            agg = (sub.groupby("hero", as_index=False)
+                      .agg(players=("account_id", "nunique"),
+                           matches=("matches", "sum"),
+                           wins=("wins", "sum")))
+            agg["win_rate"] = (agg["wins"] / agg["matches"] * 100).round(1)
+            agg = agg.sort_values("matches", ascending=False)
+
+            wr = sub["wins"].sum() / sub["matches"].sum() * 100
+            st.subheader(f"{team} — {int(sub['matches'].sum())} matches, {wr:.1f}% win rate")
+            st.dataframe(
+                agg, hide_index=True, use_container_width=True,
+                column_config={
+                    "hero": "Hero",
+                    "players": st.column_config.NumberColumn("Players"),
+                    "matches": st.column_config.NumberColumn("Played"),
+                    "wins": st.column_config.NumberColumn("Wins"),
+                    "win_rate": WINRATE_COL,
+                },
+            )
 
 # ---- everything, downloadable
 with tab_data:
     st.dataframe(df, hide_index=True, use_container_width=True)
+    safe = preset.replace(" ", "_").replace("—", "").lower()
     st.download_button(
         "Download CSV",
         df.to_csv(index=False).encode("utf-8"),
-        file_name=f"deadlock_report_{days}d.csv",
+        file_name=f"deadlock_{safe}_{days}d.csv",
         mime="text/csv",
     )

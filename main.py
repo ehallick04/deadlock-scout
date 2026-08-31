@@ -8,6 +8,9 @@ data and formats it. No HTTP and no game logic lives here.
     python main.py 880934744 104579843
     python main.py https://statlocker.gg/profile/880934744/matches?mode=standard
     python main.py --file ids.txt --days 30 --top 5 --csv players.csv
+    python main.py --pros All                      # every pro team, customs only
+    python main.py --pros NA --days 14
+    python main.py --pros Leviathan --days 30
     python main.py 880934744 --with-customs        # ranked + unranked + customs
     python main.py 880934744 --mode ranked         # ranked only
     python main.py 880934744 --mode private_lobby  # custom games only
@@ -23,9 +26,11 @@ import os
 import sys
 
 from deadlock import (
-    DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE, WITH_CUSTOMS,
-    build_report, flatten, get_rank, parse_ids, read_id_file, rank_name,
+    CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
+    WITH_CUSTOMS, build_report, flatten, get_rank, hero_totals, parse_ids,
+    read_id_file, rank_name,
 )
+from teams import TEAMS, choices, roster
 
 
 # --------------------------------------------------------------- output
@@ -36,8 +41,9 @@ def print_report(players, days, match_mode=DEFAULT_MATCH_MODE,
           f"last {days} days")
     for p in players:
         print(f"\n{'=' * 58}")
-        who = p.get("persona_name") or "(name unavailable)"
-        print(f"  {who}   [{p['account_id']}]   {p['rank_label']}")
+        who = p.get("ign") or p.get("persona_name") or "(name unavailable)"
+        team = f"  ({p['team']})" if p.get("team") else ""
+        print(f"  {who}{team}   [{p['account_id']}]   {p['rank_label']}")
         print(f"  {p['total_matches']} matches in the last {days} days")
         print(f"{'=' * 58}")
 
@@ -69,14 +75,33 @@ def write_csv(players, path):
     print(f"\nwrote {len(rows)} rows to {path}")
 
 
-def run(ids, days=30, top=5, use_history=False, csv_path=None,
-        match_mode=DEFAULT_MATCH_MODE, game_mode=DEFAULT_GAME_MODE):
+def run(ids, days=DEFAULT_DAYS, top=5, use_history=False, csv_path=None,
+        match_mode=DEFAULT_MATCH_MODE, game_mode=DEFAULT_GAME_MODE,
+        labels=None, show_totals=False):
     players = build_report(ids, days=days, top=top, use_history=use_history,
-                           match_mode=match_mode, game_mode=game_mode)
+                           match_mode=match_mode, game_mode=game_mode,
+                           labels=labels)
     print_report(players, days, match_mode, game_mode)
+    if show_totals:
+        print_hero_totals(players)
     if csv_path:
         write_csv(players, csv_path)
     return players
+
+
+def print_hero_totals(players):
+    """Win rate per hero, pooled across every player in the report."""
+    totals = hero_totals(players)
+    if not totals:
+        return
+    print(f"\n{'=' * 58}")
+    print("  HERO TOTALS (everyone pooled)")
+    print(f"{'=' * 58}")
+    print(f"  {'hero':<16}{'players':>8}{'played':>8}{'wins':>7}{'win rate':>11}")
+    print(f"  {'-' * 50}")
+    for t in totals:
+        print(f"  {t['hero']:<16}{t['players']:>8}{t['matches']:>8}"
+              f"{t['wins']:>7}{t['win_rate']:>10.1f}%")
 
 
 # --------------------------------------------------------------- menu
@@ -140,6 +165,43 @@ def find_file(text):
     return None
 
 
+def pros_menu(days, top):
+    """Preset rosters. Custom games only, since that is where pros scrim."""
+    picks = choices()
+
+    print("\n  --- Pros: pick a roster ---")
+    for i, name in enumerate(picks, 1):
+        if name == "All":
+            n = sum(len(t["players"]) for t in TEAMS.values())
+            print(f"    {i:>2}. All teams ({n} players)")
+        elif name in ("NA", "EU"):
+            n = sum(len(t["players"]) for t in TEAMS.values()
+                    if t["region"] == name)
+            print(f"    {i:>2}. {name} ({n} players)")
+        else:
+            t = TEAMS[name]
+            print(f"    {i:>2}. {name} [{t['region']}] ({len(t['players'])} players)")
+
+    pick = ask("  number (blank = cancel): ")
+    if not pick or not pick.isdigit() or not 1 <= int(pick) <= len(picks):
+        return
+
+    selection = picks[int(pick) - 1]
+    ids, labels = roster(selection)
+
+    d = ask(f"  days to look back (blank = {days}): ", str(days))
+    days = int(d) if d and d.isdigit() else days
+    t = ask(f"  heroes per player (blank = {top}): ", str(top))
+    top = int(t) if t and t.isdigit() else top
+
+    safe = selection.replace(" ", "_").lower()
+    path = f"pros_{safe}_{days}d.csv"
+
+    print(f"\n  {selection}: {len(ids)} players, custom games, last {days} days")
+    run(ids, days=days, top=top, match_mode=CUSTOMS_ONLY,
+        labels=labels, csv_path=path, show_totals=True)
+
+
 MATCH_MODES = [
     "ranked,unranked",                    # the API default
     "ranked,unranked,private_lobby",      # + custom games
@@ -154,12 +216,13 @@ MATCH_MODES = [
 
 
 def menu():
-    ids, days, top = [], 30, 5
+    ids, days, top = [], DEFAULT_DAYS, 5
     match_mode, game_mode = DEFAULT_MATCH_MODE, DEFAULT_GAME_MODE
 
     while True:
         print(f"""
 ============== DEADLOCK PLAYER REPORT ==============
+  P. Pros  (preset team rosters, custom games)
   1. Add players (ids or statlocker URLs)
   2. Load ids from a file
   3. Set time window        (now: last {days} days)
@@ -179,7 +242,10 @@ def menu():
             print("  bye")
             return
 
-        if choice == "1":
+        if choice.lower() == "p":
+            pros_menu(days, top)
+
+        elif choice == "1":
             raw = ask("  paste ids or URLs (space or comma separated): ")
             if raw:
                 found = parse_ids(raw.replace(",", " ").split())
@@ -249,7 +315,7 @@ def parse_args(args):
     def flag(name, default=None, cast=str):
         return cast(args[args.index(name) + 1]) if name in args else default
 
-    days = flag("--days", 30, int)
+    days = flag("--days", DEFAULT_DAYS, int)
     top = flag("--top", 5, int)
     csv_path = flag("--csv")
     match_mode = flag("--mode", DEFAULT_MATCH_MODE)
@@ -278,6 +344,17 @@ if __name__ == "__main__":
 
     if not args:
         menu()
+        sys.exit()
+
+    # --pros "Leviathan" | --pros NA | --pros All
+    if "--pros" in args:
+        selection = args[args.index("--pros") + 1]
+        ids, labels = roster(selection)
+        days = int(args[args.index("--days") + 1]) if "--days" in args else DEFAULT_DAYS
+        top = int(args[args.index("--top") + 1]) if "--top" in args else 5
+        safe = selection.replace(" ", "_").lower()
+        run(ids, days=days, top=top, match_mode=CUSTOMS_ONLY, labels=labels,
+            csv_path=f"pros_{safe}_{days}d.csv", show_totals=True)
         sys.exit()
 
     ids, days, top, csv_path, match_mode, game_mode = parse_args(args)

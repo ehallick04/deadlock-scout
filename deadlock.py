@@ -43,6 +43,11 @@ DEFAULT_MATCH_MODE = "ranked,unranked"
 # Same, plus custom games. Make this the DEFAULT_MATCH_MODE value above if
 # you want customs counted everywhere without passing a flag.
 WITH_CUSTOMS = "ranked,unranked,private_lobby"
+CUSTOMS_ONLY = "private_lobby"
+
+# Pro scrims happen in custom lobbies and turn over fast, so two weeks is
+# the useful default rather than a month.
+DEFAULT_DAYS = 14
 
 
 # --------------------------------------------------------------- inputs
@@ -203,8 +208,9 @@ def hero_stats_from_history(account_id, days=30, match_mode_ids=None,
 
 # --------------------------------------------------------------- report
 
-def build_report(account_ids, days=30, top=5, use_history=False,
-                 match_mode=DEFAULT_MATCH_MODE, game_mode=DEFAULT_GAME_MODE):
+def build_report(account_ids, days=DEFAULT_DAYS, top=5, use_history=False,
+                 match_mode=DEFAULT_MATCH_MODE, game_mode=DEFAULT_GAME_MODE,
+                 labels=None):
     """
     The whole thing, as DATA:
 
@@ -213,8 +219,12 @@ def build_report(account_ids, days=30, top=5, use_history=False,
           'heroes': [{'hero': 'Bebop', 'hero_id': 15, 'matches': 42,
                       'wins': 25, 'win_rate': 59.5}, ...]}, ...]
 
+    `labels` optionally maps account_id -> {"ign", "team", "region"}, so a
+    known roster name can sit alongside whatever Steam persona is set today.
+
     Printing is main.py's job.
     """
+    labels = labels or {}
     names = hero_names()
     profiles = steam_profiles(account_ids)
 
@@ -249,8 +259,12 @@ def build_report(account_ids, days=30, top=5, use_history=False,
             })
 
         profile = profiles.get(account_id, {})
+        label = labels.get(account_id, {})
         players.append({
             "account_id": account_id,
+            "ign": label.get("ign", ""),
+            "team": label.get("team", ""),
+            "region": label.get("region", ""),
             "persona_name": profile.get("personaname", ""),
             "steam_id64": to_steamid64(account_id),
             "profile_url": profile.get("profileurl", ""),
@@ -269,8 +283,38 @@ def flatten(players):
     """Nested report -> flat rows, one per player+hero. For CSV or pandas."""
     return [
         {"account_id": p["account_id"],
+         "ign": p.get("ign", ""),
+         "team": p.get("team", ""),
+         "region": p.get("region", ""),
          "persona_name": p.get("persona_name", ""),
          "rank": p["rank_label"],
          "rank_num": p["rank"], "subrank": p["subrank"], **h}
         for p in players for h in p["heroes"]
     ]
+
+
+def hero_totals(players):
+    """
+    Win rate per hero pooled across everyone in the report.
+    -> [{'hero', 'players', 'matches', 'wins', 'win_rate'}] sorted by matches.
+    """
+    pool = {}
+    for p in players:
+        for h in p["heroes"]:
+            row = pool.setdefault(h["hero"], {"hero": h["hero"], "players": set(),
+                                              "matches": 0, "wins": 0})
+            row["players"].add(p["account_id"])
+            row["matches"] += h["matches"]
+            row["wins"] += h["wins"]
+
+    out = []
+    for row in pool.values():
+        out.append({
+            "hero": row["hero"],
+            "players": len(row["players"]),
+            "matches": row["matches"],
+            "wins": row["wins"],
+            "win_rate": round(row["wins"] / row["matches"] * 100, 1)
+            if row["matches"] else 0.0,
+        })
+    return sorted(out, key=lambda r: -r["matches"])
