@@ -20,7 +20,8 @@ from api import cache_info, clear_cache, export_cache, import_cache
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
     WITH_CUSTOMS, build_report, build_team_report, composition_counts,
-    ability_order, ability_rows, buy_order, buy_order_by_player, flatten,
+    ABILITY_STYLES, ability_order, ability_rows, buy_order,
+    buy_order_by_player, flatten,
     flow_edges, flow_rows, hero_names, hero_totals, item_flow, match_compositions,
     parse_ids, phase_label,
 )
@@ -783,9 +784,17 @@ with tab_items:
     if hero_id is None:
         st.caption("Pick a hero above — this endpoint needs one.")
     else:
+        style = st.radio(
+            "Show abilities as", list(ABILITY_STYLES), horizontal=True,
+            index=1,
+            help="Numbers are the 1/2/3/4 slots from the hero's asset. "
+                 "Anything outside those four (an innate, say) keeps its "
+                 "name.")
         try:
-            arows = ability_rows(load_ability_raw(tuple(ids), hero_id, days,
-                                                  match_mode, min_matches))
+            arows = ability_rows(
+                load_ability_raw(tuple(ids), hero_id, days, match_mode,
+                                 min_matches),
+                hero_id=hero_id, style=style)
         except Exception as e:
             arows, _ = [], st.error(f"Could not load ability order: {e}")
         if not arows:

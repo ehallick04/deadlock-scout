@@ -1080,10 +1080,84 @@ def ability_order(hero_id, account_ids=(), days=DEFAULT_DAYS,
                               hero_id))
 
 
-def ability_rows(raw, names=None, top=25):
+# Hero assets map a slot name to an ability's class_name; the item assets map
+# that class_name to its id. Chain them and an ability id becomes the 1/2/3/4
+# a player actually presses. Slot names come from the API's own enum
+# (HashMap_HeroItemType_String): Signature1..Signature4 are the four upgradable
+# abilities; innates, mantle, jump, slide and zipline share the same map and
+# have no number.
+SIGNATURE_SLOTS = ("Signature1", "Signature2", "Signature3", "Signature4")
+
+ABILITY_STYLES = ("Names", "Numbers", "Both")
+
+
+def _class_to_id(refresh=False):
+    """{class_name: item_id} across every asset, abilities included."""
+    out = {}
+    for it in _walk_dicts(items(refresh)):
+        iid, cls = it.get("id"), it.get("class_name")
+        if isinstance(iid, int) and isinstance(cls, str):
+            out.setdefault(cls, iid)
+    return out
+
+
+def ability_slots(hero_id, refresh=False):
+    """
+    {ability_id: 1|2|3|4} for one hero.
+
+    Empty when the hero is unknown or the assets do not carry slot names --
+    callers fall back to ability names, so an empty map degrades to today's
+    behaviour rather than breaking.
+    """
+    hero = next((h for h in _walk_dicts(heroes(refresh))
+                 if h.get("id") == hero_id and isinstance(h.get("items"), dict)),
+                None)
+    if not hero:
+        return {}
+
+    by_class = _class_to_id(refresh)
+    slots = {}
+    for position, slot in enumerate(SIGNATURE_SLOTS, start=1):
+        class_name = hero["items"].get(slot)
+        if not isinstance(class_name, str):
+            continue
+        ability_id = by_class.get(class_name)
+        if isinstance(ability_id, int):
+            slots[ability_id] = position
+    return slots
+
+
+def format_order(ability_ids, names=None, slots=None, style="Names"):
+    """
+    One upgrade order, rendered.
+
+        Names    Bomb > Hook > Bomb > Uppercut
+        Numbers  1 > 2 > 1 > 3
+        Both     1 Bomb > 2 Hook > 1 Bomb > 3 Uppercut
+
+    An id with no signature slot (an innate, say) keeps its name in every
+    style, so nothing silently disappears.
+    """
+    names, slots = names or {}, slots or {}
+    parts = []
+    for a in ability_ids:
+        number, name = slots.get(a), names.get(a, str(a))
+        if style == "Numbers":
+            parts.append(str(number) if number else name)
+        elif style == "Both":
+            parts.append(f"{number} {name}" if number else name)
+        else:
+            parts.append(name)
+    return " > ".join(parts)
+
+
+def ability_rows(raw, names=None, top=25, hero_id=None, style="Names"):
     """
     AnalyticsAbilityOrderStats carries `abilities` -- the upgrade order as a
     list of ability ids. One row per distinct order.
+
+    style is one of ABILITY_STYLES. Numbers need hero_id, since a slot number
+    only means anything relative to one hero.
 
     -> [{'order','ability_ids','matches','players','win_rate'}]
     """
@@ -1092,6 +1166,13 @@ def ability_rows(raw, names=None, top=25):
             names = item_names()
         except Exception:
             names = {}
+
+    slots = {}
+    if style in ("Numbers", "Both") and hero_id is not None:
+        try:
+            slots = ability_slots(hero_id)
+        except Exception:
+            slots = {}
 
     nodes = raw if isinstance(raw, list) else None
     if nodes is None:
@@ -1107,7 +1188,7 @@ def ability_rows(raw, names=None, top=25):
         games = _pick(n, COUNT_KEYS, 0) or 0
         wins = _pick(n, WIN_KEYS) or 0
         rows.append({
-            "order": " > ".join(names.get(a, str(a)) for a in order),
+            "order": format_order(order, names, slots, style),
             "ability_ids": order,
             "matches": games,
             "players": n.get("players"),

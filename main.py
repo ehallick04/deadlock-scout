@@ -44,7 +44,8 @@ from api import cache_info, clear_cache, export_cache, import_cache
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
     WITH_CUSTOMS, build_report, build_team_report, composition_counts,
-    ability_order, ability_rows, buy_order, buy_order_by_player, flatten,
+    ABILITY_STYLES, ability_order, ability_rows, buy_order,
+    buy_order_by_player, flatten,
     flow_edges, flow_rows, get_rank, hero_names, hero_totals, item_flow,
     match_compositions, parse_ids, read_id_file, rank_name,
 )
@@ -336,12 +337,17 @@ def item_order_menu(ids, labels, days, match_mode):
 
     if hero_id is not None and ask("  show ability point order? (y/N): ",
                                    "n").lower().startswith("y"):
+        pick = ask("  show abilities as 1=numbers 2=names 3=both "
+                   "(blank = numbers): ", "1")
+        style = {"1": "Numbers", "2": "Names", "3": "Both"}.get(pick.strip(),
+                                                                "Numbers")
         try:
             print_ability_order(
                 ability_rows(ability_order(hero_id, ids, days=days,
                                            match_mode=match_mode,
-                                           min_matches=min_matches)),
-                hero_label)
+                                           min_matches=min_matches),
+                             hero_id=hero_id, style=style),
+                f"{hero_label} ({style.lower()})")
         except Exception as e:
             print(f"  ability request failed: {e}")
 
