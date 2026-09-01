@@ -44,7 +44,9 @@ from api import cache_info, clear_cache, export_cache, import_cache
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
     WITH_CUSTOMS, build_report, build_team_report, composition_counts,
-    ability_order, ability_rows, buy_order, buy_order_by_player, flatten,
+    ability_order, ability_rows, build_summary, buy_order,
+    buy_order_by_player, custom_match_ids, flatten,
+    match_build_order, match_builds, metadata_report,
     flow_edges, flow_rows, get_rank, hero_names, hero_totals, item_flow,
     parse_ids, read_id_file,
 )
@@ -361,6 +363,10 @@ def pros_menu(days, top):
     if ask("\n  show build order too? (y/N): ", "n").lower().startswith("y"):
         item_order_menu(ids, labels, days, CUSTOMS_ONLY)
 
+    if ask("  show builds from the real matches? (y/N): ",
+           "n").lower().startswith("y"):
+        match_builds_menu(ids, labels, days, CUSTOMS_ONLY)
+
 
 def print_buy_order(rows, title="BUY ORDER", limit=40):
     """Items in the order they get bought, with the clock time."""
@@ -419,6 +425,100 @@ def print_ability_order(rows, hero_label, limit=15):
     for r in rows[:limit]:
         wr = f"{r['win_rate']:.1f}%" if r["win_rate"] is not None else "-"
         print(f"  {r['matches']:>5} games{wr:>9}   {r['order']}")
+
+
+def print_match_builds(rows, kind="item", limit=40):
+    """Per-player summary of what they actually bought in real games."""
+    summary = build_summary(rows, kind=kind)
+    if not summary:
+        print(f"  no {kind} purchases found in those matches")
+        return
+    games = len({r["match_id"] for r in rows})
+    what = "items" if kind == "item" else "ability points"
+    print(f"\n{'=' * 70}")
+    print(f"  FROM MATCHES — {what} across {games} games")
+    print(f"{'=' * 70}")
+    player = object()
+    for s in summary[:limit]:
+        if s["player"] != player:
+            player = s["player"]
+            print(f"\n  {player}")
+            print(f"  {'-' * 56}")
+        wr = f"{s['win_rate']:.1f}%" if s["win_rate"] is not None else "-"
+        print(f"    {s['buy_time']:>6}  {s['item']:<28}"
+              f"{s['buys']:>5}{wr:>9}")
+
+
+def print_one_match(rows, match_id, kind=None):
+    """One game, every roster player in it, purchases in order."""
+    people = sorted({(r["account_id"], r["player"]) for r in rows
+                     if r["match_id"] == match_id})
+    if not people:
+        print(f"  nothing recorded for match {match_id}")
+        return
+    print(f"\n{'=' * 70}")
+    print(f"  MATCH {match_id}")
+    print(f"{'=' * 70}")
+    for account_id, player in people:
+        seq = match_build_order(rows, match_id, account_id, kind=kind)
+        if not seq:
+            continue
+        hero = seq[0].get("hero") or "?"
+        won = seq[0].get("won")
+        tag = "" if won is None else ("  won" if won else "  lost")
+        print(f"\n  {player} — {hero}{tag}")
+        print(f"  {'-' * 56}")
+        for r in seq:
+            print(f"    {r['buy_time']:>6}  {r['kind']:<8}{r['item']}")
+
+
+def match_builds_menu(ids, labels, days, match_mode):
+    """Builds read out of match metadata rather than the analytics endpoints."""
+    if not ids:
+        print("  add some players first")
+        return
+    try:
+        by_player = custom_match_ids(ids, days=days, match_mode=match_mode)
+    except Exception as e:
+        print(f"  could not list matches: {e}")
+        return
+
+    every = sorted({m for v in by_player.values() for m in v}, reverse=True)
+    if not every:
+        print("  no matches for these players in this window")
+        return
+
+    n = ask(f"  {len(every)} matches in window. read how many "
+            f"(blank = 20): ", "20")
+    limit = int(n) if n.isdigit() else 20
+    print(f"  reading {min(limit, len(every))} matches "
+          "(cached ones are instant) ...")
+    try:
+        rows = match_builds(every, account_ids=ids, labels=labels,
+                            limit=limit)
+    except Exception as e:
+        print(f"  request failed: {e}")
+        return
+
+    if not rows:
+        print("  no purchases found. what one blob actually contains:")
+        try:
+            for k, v in metadata_report(every[0]).items():
+                print(f"    {k}: {v}")
+        except Exception as e:
+            print(f"    (diagnostic failed: {e})")
+        return
+
+    print_match_builds(rows, kind="item")
+    if ask("\n  show ability points too? (y/N): ", "n").lower().startswith("y"):
+        print_match_builds(rows, kind="ability")
+
+    played = sorted({r["match_id"] for r in rows}, reverse=True)
+    print(f"\n  matches read: {', '.join(str(m) for m in played[:12])}"
+          + (" ..." if len(played) > 12 else ""))
+    want = ask("  show one match in full? (match id, blank = no): ")
+    if want and want.isdigit() and int(want) in played:
+        print_one_match(rows, int(want))
 
 
 def pick_hero():
@@ -532,6 +632,7 @@ def menu():
   H. Import a roster from a saved team page (.html)
   B. Bake in every league team (harvester bookmarklet)
   I. Build order (items, phases, ability points)
+  M. Builds from real matches (uses cached match data)
   1. Add players (ids or statlocker URLs)
   2. Load ids from a file
   3. Set time window        (now: last {days} days)
@@ -556,6 +657,9 @@ def menu():
 
         elif choice.lower() == "i":
             item_order_menu(ids, {}, days, match_mode)
+
+        elif choice.lower() == "m":
+            match_builds_menu(ids, {}, days, match_mode)
 
         elif choice.lower() == "b":
             from roster_import import HARVESTER

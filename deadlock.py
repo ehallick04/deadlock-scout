@@ -1214,3 +1214,239 @@ def ability_rows(raw, names=None, top=25, hero_id=None, style="Names",
         })
     rows.sort(key=lambda r: -r["matches"])
     return rows[:top]
+
+
+# ---- per-match builds, read out of match metadata
+
+# /v1/matches/{id}/metadata returns Valve's CMsgMatchMetaDataContents parsed
+# to JSON. It is untyped in the API's OpenAPI spec, so the exact field names
+# are discovered rather than assumed: a player is any dict carrying a positive
+# account_id, and a purchase list is any list of dicts carrying both an item
+# id and a timestamp. metadata_report() prints what was actually found, for
+# when a blob does not match.
+
+ITEM_TIME_KEYS = ("game_time_s", "game_time", "time_s", "purchase_time_s",
+                  "bought_at_s", "buy_time_s")
+SOLD_TIME_KEYS = ("sold_time_s", "sold_time", "sell_time_s")
+TEAM_KEYS = ("team", "player_team", "team_number")
+WINNER_KEYS = ("winning_team", "match_winner", "winner", "match_result")
+
+
+def all_ability_ids(refresh=False):
+    """
+    Every id that is a hero ability rather than a shop item.
+
+    Ability points are recorded as purchases too, so this is what separates
+    "bought Extra Health" from "put a point in Hook".
+    """
+    by_class = _class_to_id(refresh)
+    out = set()
+    for hero in _walk_dicts(heroes(refresh)):
+        bound = hero.get("items")
+        if not isinstance(bound, dict):
+            continue
+        for value in bound.values():
+            if isinstance(value, int):
+                out.add(value)
+            elif isinstance(value, str) and value in by_class:
+                out.add(by_class[value])
+    return out
+
+
+# an explicit item key beats a bare `id`, so a long stats timeline that
+# happens to carry `id` cannot outrank the real purchase list
+STRICT_ITEM_KEYS = ("item_id", "upgrade_id", "ability_id")
+
+
+def _item_entries(player):
+    """
+    The list of dicts inside a player node that looks like purchases.
+
+    Tried strictly first (entries naming item_id/upgrade_id/ability_id), then
+    loosely (a bare `id`), so a stats timeline never wins on length alone.
+    -> list of dicts, or [] when the blob has none.
+    """
+    for keys in (STRICT_ITEM_KEYS, ITEM_KEYS):
+        best = []
+        for value in player.values():
+            if not isinstance(value, list) or not value:
+                continue
+            rows = [v for v in value if isinstance(v, dict)]
+            looks_right = [r for r in rows
+                           if _pick(r, keys) is not None
+                           and _pick(r, ITEM_TIME_KEYS) is not None]
+            if len(looks_right) > len(best):
+                best = looks_right
+        if best:
+            return best
+    return []
+
+
+def _match_winner(md):
+    """The winning team number, if the blob names one."""
+    for d in _walk_dicts(md):
+        for key in WINNER_KEYS:
+            v = d.get(key)
+            if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 10:
+                return v
+    return None
+
+
+def match_builds(match_ids, account_ids=(), labels=None, limit=60,
+                 pause=0.05, names=None, hero_lookup=None,
+                 ability_ids=None):
+    """
+    What each player actually bought, per match, straight from metadata.
+
+    Finished matches are cached permanently, so any match already pulled for
+    the Matches tab costs nothing to read again.
+
+    -> [{'match_id','account_id','player','hero','hero_id','kind','item',
+         'item_id','bought_s','buy_time','sold_s','won'}]
+       sorted by match, then player, then purchase time.
+    """
+    labels = labels or {}
+    wanted = {int(a) for a in account_ids} if account_ids else None
+    if names is None:
+        try:
+            names = item_names()
+        except Exception:
+            names = {}
+    if hero_lookup is None:
+        try:
+            hero_lookup = hero_names()
+        except Exception:
+            hero_lookup = {}
+    if ability_ids is None:
+        try:
+            ability_ids = all_ability_ids()
+        except Exception:
+            ability_ids = set()
+
+    ids = list(match_ids)[:limit]
+    rows = []
+    for mid in ids:
+        try:
+            md = get_json(f"/v1/matches/{mid}/metadata", disable_steam="true")
+        except urllib.error.HTTPError:
+            continue
+
+        winner = _match_winner(md)
+        for player in _walk_dicts(md):
+            account_id = player.get("account_id")
+            if not isinstance(account_id, int) or account_id <= 0:
+                continue
+            if wanted is not None and account_id not in wanted:
+                continue
+
+            entries = _item_entries(player)
+            if not entries:
+                continue
+
+            hero_id = player.get("hero_id")
+            team = _pick(player, TEAM_KEYS)
+            won = None
+            if winner is not None and isinstance(team, int):
+                won = (team == winner)
+
+            who = labels.get(account_id, {})
+            for e in entries:
+                item_id = _pick(e, ITEM_KEYS)
+                bought = _pick(e, ITEM_TIME_KEYS)
+                sold = _pick(e, SOLD_TIME_KEYS)
+                rows.append({
+                    "match_id": mid,
+                    "account_id": account_id,
+                    "player": who.get("ign") or str(account_id),
+                    "hero_id": hero_id,
+                    "hero": hero_lookup.get(hero_id, ""),
+                    "kind": "ability" if item_id in ability_ids else "item",
+                    "item": names.get(item_id, f"item {item_id}"),
+                    "item_id": item_id,
+                    "bought_s": bought,
+                    "buy_time": mmss(bought),
+                    "sold_s": sold or None,
+                    "won": won,
+                })
+        time.sleep(pause)
+
+    rows.sort(key=lambda r: (r["match_id"], r["player"], r["bought_s"] or 0))
+    return rows
+
+
+def build_summary(rows, kind="item"):
+    """
+    Per player and item across the matches read: how often, how early, how
+    it went. The per-match answer to what buy_order() asks the API.
+
+    -> [{'player','item','kind','buys','matches','avg_buy_s','buy_time',
+         'wins','win_rate'}] sorted per player by average buy time.
+    """
+    tally = {}
+    for r in rows:
+        if kind and r["kind"] != kind:
+            continue
+        key = (r["player"], r["item_id"])
+        row = tally.setdefault(key, {
+            "player": r["player"], "account_id": r["account_id"],
+            "item": r["item"], "item_id": r["item_id"], "kind": r["kind"],
+            "buys": 0, "_times": [], "_matches": set(), "wins": 0,
+            "_decided": 0})
+        row["buys"] += 1
+        row["_matches"].add(r["match_id"])
+        if r["bought_s"] is not None:
+            row["_times"].append(r["bought_s"])
+        if r["won"] is not None:
+            row["_decided"] += 1
+            row["wins"] += 1 if r["won"] else 0
+
+    out = []
+    for row in tally.values():
+        times = row.pop("_times")
+        matches = row.pop("_matches")
+        decided = row.pop("_decided")
+        avg = sum(times) / len(times) if times else None
+        row["matches"] = len(matches)
+        row["avg_buy_s"] = round(avg, 1) if avg is not None else None
+        row["buy_time"] = mmss(avg)
+        row["win_rate"] = (round(row["wins"] / decided * 100, 1)
+                           if decided else None)
+        out.append(row)
+
+    out.sort(key=lambda r: (r["player"],
+                            r["avg_buy_s"] is None, r["avg_buy_s"] or 0))
+    return out
+
+
+def match_build_order(rows, match_id, account_id=None, kind="item"):
+    """One game, one player: the purchases in the order they happened."""
+    picked = [r for r in rows
+              if r["match_id"] == match_id
+              and (account_id is None or r["account_id"] == account_id)
+              and (not kind or r["kind"] == kind)]
+    picked.sort(key=lambda r: r["bought_s"] or 0)
+    return picked
+
+
+def metadata_report(match_id):
+    """
+    What a metadata blob actually contains, for when extraction finds
+    nothing. Returns a small dict rather than printing, so both front ends
+    can show it.
+    """
+    md = get_json(f"/v1/matches/{match_id}/metadata", disable_steam="true")
+    players = [d for d in _walk_dicts(md)
+               if isinstance(d.get("account_id"), int) and d["account_id"] > 0]
+    sample = players[0] if players else {}
+    lists = {k: f"{len(v)} x {sorted(v[0])[:12]}"
+             for k, v in sample.items()
+             if isinstance(v, list) and v and isinstance(v[0], dict)}
+    return {
+        "match_id": match_id,
+        "top_level_keys": sorted(md)[:20] if isinstance(md, dict) else [],
+        "players_found": len(players),
+        "player_keys": sorted(sample)[:30],
+        "list_fields_on_player": lists,
+        "purchases_found": len(_item_entries(sample)),
+        "winner": _match_winner(md),
+    }

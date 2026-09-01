@@ -20,7 +20,9 @@ from api import cache_info, clear_cache, export_cache, import_cache
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
     WITH_CUSTOMS, build_report, build_team_report, composition_counts,
-    ABILITY_STYLES, ability_order, ability_rows, ability_slots, buy_order,
+    ABILITY_STYLES, ability_order, ability_rows, ability_slots,
+    build_summary, buy_order, custom_match_ids, match_build_order,
+    match_builds, metadata_report,
     buy_order_by_player, flatten,
     flow_edges, flow_rows, hero_names, hero_totals, item_flow, match_compositions,
     parse_ids, phase_label,
@@ -432,6 +434,22 @@ def load_buy_order_players(ids_tuple, labels_tuple, hero_id, days,
                                min_matches=min_matches)
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_match_ids(ids_tuple, days, match_mode):
+    """{account_id: set(match_id)} -- one batched call."""
+    by_player = custom_match_ids(list(ids_tuple), days=days,
+                                 match_mode=match_mode)
+    return {k: sorted(v) for k, v in by_player.items()}
+
+
+@st.cache_data(ttl=24 * 3600, show_spinner=False)
+def load_match_builds(match_ids_tuple, ids_tuple, labels_tuple, limit):
+    """Purchases read out of match metadata. Finished matches never change."""
+    labels = {k: dict(v) for k, v in labels_tuple}
+    return match_builds(list(match_ids_tuple), account_ids=list(ids_tuple),
+                        labels=labels, limit=limit)
+
+
 @st.cache_data(ttl=7 * 24 * 3600, show_spinner=False)
 def load_ability_slots(hero_id):
     """{ability_id: 1-4} from the cached hero + item assets."""
@@ -625,7 +643,8 @@ with tab_items:
         40, "Rows shown", minimum=1, maximum=500)
 
     key = (tuple(ids), hero_id, days, match_mode, min_matches)
-    view = st.radio("View", ["Buy order", "By phase", "What follows what"],
+    view = st.radio("View", ["Buy order", "By phase", "What follows what",
+                             "From matches"],
                     horizontal=True, label_visibility="collapsed")
 
     # ---------------------------------------------------------- buy order
@@ -713,6 +732,110 @@ with tab_items:
             st.download_button("Download phases (CSV)",
                                frame.to_csv(index=False).encode(),
                                file_name="build_phases.csv", mime="text/csv")
+
+    # ------------------------------------------------- from real matches
+    elif view == "From matches":
+        st.caption("Read straight out of each match's metadata: the actual "
+                   "purchases, in the actual games, on the hero they actually "
+                   "played. Finished matches are cached permanently, so any "
+                   "match already loaded costs nothing.")
+
+        mc1, mc2 = st.columns([1, 1])
+        how_many = whole_number(
+            mc1.text_input("Matches to read", value="20"),
+            20, "Matches to read", minimum=1, maximum=200)
+        kind = mc2.radio("Show", ["Items", "Ability points"], horizontal=True)
+        kind_key = "item" if kind == "Items" else "ability"
+
+        try:
+            by_player = load_match_ids(tuple(ids), days, match_mode)
+        except Exception as e:
+            by_player, _ = {}, st.error(f"Could not list matches: {e}")
+
+        every_match = sorted({m for v in by_player.values() for m in v},
+                             reverse=True)
+        if not every_match:
+            st.info("No matches for these players in this window.")
+        else:
+            st.caption(f"{len(every_match)} matches in window; reading the "
+                       f"{min(how_many, len(every_match))} most recent.")
+            if st.button("Read matches"):
+                st.session_state.read_builds = True
+
+            if st.session_state.get("read_builds"):
+                labels_tuple = tuple((k, tuple(sorted(v.items())))
+                                     for k, v in sorted(labels.items()))
+                try:
+                    brows = load_match_builds(tuple(every_match), tuple(ids),
+                                              labels_tuple, how_many)
+                except Exception as e:
+                    brows, _ = [], st.error(f"Could not read matches: {e}")
+
+                if not brows:
+                    st.warning(
+                        "No purchases found in those matches. The metadata "
+                        "shape may differ from what this expects — the report "
+                        "below shows what one blob actually contains.")
+                    with st.expander("Metadata diagnostic"):
+                        try:
+                            st.json(metadata_report(every_match[0]))
+                        except Exception as e:
+                            st.write(f"(request failed: {e})")
+                else:
+                    summary = build_summary(brows, kind=kind_key)
+                    sframe = pd.DataFrame(summary)
+                    seen = sorted(sframe["player"].unique())
+                    st.caption(f"{len(brows)} purchases across "
+                               f"{len({r['match_id'] for r in brows})} matches, "
+                               f"{len(seen)} players.")
+                    who = st.multiselect("Players", seen, default=seen,
+                                         key="mb_players")
+                    st.dataframe(
+                        sframe[sframe["player"].isin(who)][
+                            ["player", "buy_time", "item", "buys", "matches",
+                             "win_rate"]],
+                        hide_index=True, use_container_width=True,
+                        column_config={
+                            "player": "Player",
+                            "buy_time": st.column_config.TextColumn(
+                                "Avg bought", width="small"),
+                            "item": "Item",
+                            "buys": st.column_config.NumberColumn("Buys"),
+                            "matches": st.column_config.NumberColumn("Games"),
+                            "win_rate": st.column_config.ProgressColumn(
+                                "Win rate", format="%.1f%%", min_value=0,
+                                max_value=100),
+                        })
+                    st.download_button(
+                        "Download match builds (CSV)",
+                        pd.DataFrame(brows).to_csv(index=False).encode(),
+                        file_name="match_builds.csv", mime="text/csv")
+
+                    st.markdown("**One game at a time**")
+                    played = sorted({r["match_id"] for r in brows},
+                                    reverse=True)
+                    pick = st.selectbox("Match", played, key="mb_match")
+                    in_match = sorted({(r["account_id"], r["player"])
+                                       for r in brows
+                                       if r["match_id"] == pick})
+                    for account_id, player in in_match:
+                        seq = match_build_order(brows, pick, account_id,
+                                                kind=kind_key)
+                        if not seq:
+                            continue
+                        hero = seq[0].get("hero") or "?"
+                        won = seq[0].get("won")
+                        tag = "" if won is None else (" · won" if won
+                                                      else " · lost")
+                        with st.expander(f"{player} — {hero}{tag} "
+                                         f"({len(seq)} purchases)"):
+                            st.dataframe(
+                                pd.DataFrame(seq)[["buy_time", "item"]],
+                                hide_index=True, use_container_width=True,
+                                column_config={
+                                    "buy_time": st.column_config.TextColumn(
+                                        "At", width="small"),
+                                    "item": "Bought"})
 
     # ---------------------------------------------------- transitions
     else:
