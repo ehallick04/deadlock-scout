@@ -44,10 +44,9 @@ from api import cache_info, clear_cache, export_cache, import_cache
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
     WITH_CUSTOMS, build_report, build_team_report, composition_counts,
-    ABILITY_STYLES, ability_order, ability_rows, buy_order,
-    buy_order_by_player, flatten,
+    ability_order, ability_rows, buy_order, buy_order_by_player, flatten,
     flow_edges, flow_rows, get_rank, hero_names, hero_totals, item_flow,
-    match_compositions, parse_ids, read_id_file, rank_name,
+    parse_ids, read_id_file,
 )
 from teams import LEAGUE, PINNED, TEAMS, choices, roster, search
 
@@ -223,6 +222,144 @@ def print_hero_totals(players, normalize=True, min_games=2):
         avg = f"{t['avg_win_rate']:.1f}%" if t["avg_win_rate"] is not None else "-"
         print(f"  {t['hero']:<16}{t['pick_share']:>11.1f}%{avg:>9}"
               f"{t['players']:>9}{t['matches']:>8}{t['win_rate']:>10.1f}%")
+
+
+
+
+# --------------------------------------------------------------- menu
+
+def ask(prompt, default=""):
+    """input() that survives Ctrl-C / Ctrl-Z without a traceback."""
+    try:
+        return input(prompt).strip() or default
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return None
+
+
+def clean_path(text):
+    """
+    Make a pasted path usable. Handles the two things people always do:
+    wrapping it in quotes (needed in PowerShell, wrong at an input() prompt)
+    and using ~ for the home folder.
+    """
+    path = text.strip().strip('"').strip("'")
+    path = os.path.expanduser(os.path.expandvars(path))
+    return path
+
+
+def find_file(text):
+    """
+    Resolve a path the user typed. Returns the path, or None with an
+    explanation of everywhere it looked.
+    """
+    path = clean_path(text)
+    tried = [path]
+
+    if os.path.exists(path):
+        return path
+
+    # maybe they meant a file sitting next to the scripts
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        os.path.basename(path))
+    tried.append(here)
+    if os.path.exists(here):
+        return here
+
+    # Windows hides known extensions, so "Ids.txt" is often really "Ids.txt.txt"
+    for candidate in (path + ".txt", path.removesuffix(".txt")):
+        tried.append(candidate)
+        if os.path.exists(candidate):
+            return candidate
+
+    print("  file not found. looked for:")
+    for t in dict.fromkeys(tried):
+        print(f"    {t}")
+    folder = os.path.dirname(path) or "."
+    if os.path.isdir(folder):
+        nearby = [f for f in os.listdir(folder) if f.lower().endswith((".txt", ".csv"))]
+        if nearby:
+            print(f"  text files actually in {folder}:")
+            for f in nearby[:10]:
+                print(f"    {f}")
+    else:
+        print(f"  (the folder {folder} does not exist either)")
+    return None
+
+
+def pros_menu(days, top):
+    """Preset rosters. Custom games only, since that is where pros scrim."""
+    picks = choices()
+
+    print("\n  --- Pros: pick a roster ---")
+    for i, name in enumerate(picks, 1):
+        if name.startswith("All"):
+            n = sum(len(TEAMS[t]["players"]) for t in PINNED)
+            print(f"    {i:>2}. {name} ({n} players)")
+        elif name in ("NA", "EU"):
+            n = sum(len(t["players"]) for t in TEAMS.values()
+                    if t.get("region") == name)
+            print(f"    {i:>2}. {name} ({n} players)")
+        else:
+            t = TEAMS[name]
+            tag = t.get("region") or t.get("division") or "-"
+            print(f"    {i:>2}. {name} [{tag}] ({len(t['players'])} players)")
+
+    if LEAGUE:
+        print(f"     S. search the {len(LEAGUE)} league teams from rosters.json")
+
+    pick = ask("  number, or S to search (blank = cancel): ")
+
+    if pick.strip().lower() == "s" and LEAGUE:
+        hits = search(ask("  team name: "))
+        if not hits:
+            print("  no team matched")
+            return
+        for i, name in enumerate(hits, 1):
+            t = TEAMS[name]
+            tag = t.get("division") or t.get("region") or "-"
+            print(f"    {i:>2}. {name} [{tag}] ({len(t['players'])} players)")
+        pick = ask("  number (blank = cancel): ")
+        if not pick or not pick.isdigit() or not 1 <= int(pick) <= len(hits):
+            return
+        selection = hits[int(pick) - 1]
+    else:
+        if not pick or not pick.isdigit() or not 1 <= int(pick) <= len(picks):
+            return
+        selection = picks[int(pick) - 1]
+    ids, labels = roster(selection)
+
+    d = ask(f"  days to look back (blank = {days}): ", str(days))
+    days = int(d) if d and d.isdigit() else days
+    t = ask(f"  heroes per player (blank = {top}): ", str(top))
+    top = int(t) if t and t.isdigit() else top
+
+    tg = ask("  only games where they played TOGETHER? (Y/n): ", "y")
+    together = not tg.lower().startswith("n")
+
+    min_players, include_subs, show_matches = 4, False, 0
+    if together:
+        v = ask("  minimum roster members per match (blank = 4): ", "4")
+        min_players = int(v) if v and v.isdigit() else 4
+        sb = ask("  include stand-ins / subs? (y/N): ", "n")
+        include_subs = sb.lower().startswith("y")
+        mv = ask("  show match compositions? how many (blank = none): ")
+        show_matches = int(mv) if mv and mv.isdigit() else 0
+
+    safe = selection.replace(" ", "_").lower()
+    suffix = f"_together{min_players}" if together else ""
+    path = f"pros_{safe}_{days}d{suffix}.csv"
+
+    print(f"\n  {selection}: {len(ids)} players, custom games, last {days} days")
+    if together:
+        run_team(ids, days, top, min_players, labels, csv_path=path,
+                 include_subs=include_subs, show_matches=show_matches)
+    else:
+        run(ids, days=days, top=top, match_mode=CUSTOMS_ONLY,
+            labels=labels, csv_path=path, show_totals=True)
+
+    if ask("\n  show build order too? (y/N): ", "n").lower().startswith("y"):
+        item_order_menu(ids, labels, days, CUSTOMS_ONLY)
 
 
 def print_buy_order(rows, title="BUY ORDER", limit=40):
