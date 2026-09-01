@@ -22,12 +22,14 @@ from deadlock import (
     WITH_CUSTOMS, build_report, build_team_report, composition_counts,
     ABILITY_STYLES, ability_order, ability_rows, ability_slots,
     build_summary, buy_order, custom_match_ids, match_build_order,
-    match_builds, metadata_report, top_heroes_for, typical_builds,
+    match_builds, match_builds_bulk, metadata_report,
+    top_heroes_for, typical_builds,
     buy_order_by_player, flatten,
     flow_edges, flow_rows, hero_names, hero_totals, item_flow, match_compositions,
     parse_ids, phase_label,
 )
 from roster_import import BOOKMARKLET, HARVESTER, find_teams, parse_any
+import store
 from teams import LEAGUE, PINNED, TEAMS, divisions, roster_many
 
 st.set_page_config(page_title="Deadlock Scout", page_icon="🔒", layout="wide")
@@ -326,6 +328,19 @@ with st.sidebar.expander("Cache"):
         except Exception as e:
             st.error(f"Not a valid cache bundle: {e}")
 
+    try:
+        info = store.status()
+    except Exception as e:
+        info = {"error": str(e)}
+    if "error" not in info and info.get("matches"):
+        st.caption(f"Local store: {info['matches']} matches · "
+                   f"{info['purchases']} purchases · {info['megabytes']} MB · "
+                   f"synced {info['last_sync']}")
+    else:
+        st.caption("No local store. `python store.py sync` builds one, and "
+                   "the Build order tab can then read matches with no "
+                   "requests at all.")
+
     if st.button("Clear cache", use_container_width=True):
         removed = clear_cache()
         st.cache_data.clear()
@@ -492,6 +507,28 @@ def load_match_ids(ids_tuple, days, match_mode):
     by_player = custom_match_ids(list(ids_tuple), days=days,
                                  match_mode=match_mode)
     return {k: sorted(v) for k, v in by_player.items()}
+
+
+@st.cache_data(ttl=24 * 3600, show_spinner=False)
+def load_bulk_builds(ids_tuple, labels_tuple, days, match_mode, limit):
+    """One request for many matches, rather than one request per match."""
+    labels = {k: dict(v) for k, v in labels_tuple}
+    return match_builds_bulk(list(ids_tuple), labels=labels, days=days,
+                             match_mode=match_mode, limit=limit)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_store_status():
+    try:
+        return store.status()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def load_store_builds(ids_tuple, labels_tuple, days):
+    """Straight from SQLite -- no request, no cache needed."""
+    labels = {k: dict(v) for k, v in labels_tuple}
+    return store.purchases(list(ids_tuple), days=days, labels=labels)
 
 
 @st.cache_data(ttl=24 * 3600, show_spinner=False)
@@ -801,129 +838,107 @@ with tab_items:
                    "population and costs a fraction of the requests. This "
                    "view is for the matchup, not the mean.")
 
-        mc1, mc2 = st.columns([1, 1])
+        info = load_store_status()
+        stored = info.get("purchases", 0) if "error" not in info else 0
+
+        mc1, mc2, mc3 = st.columns([1, 1, 1])
+        source = mc1.radio(
+            "Source", ["Local store", "API (bulk)"] if stored else ["API (bulk)"],
+            horizontal=True,
+            help="The local store is a SQLite copy synced by store.py. "
+                 "Reading it costs no requests at all.")
         how_many = whole_number(
-            mc1.text_input("Matches to read", value="20"),
-            20, "Matches to read", minimum=1, maximum=200)
-        kind = mc2.radio("Show", ["Items", "Ability points"], horizontal=True)
+            mc2.text_input("Match limit", value="1000"),
+            1000, "Match limit", minimum=1, maximum=10000)
+        kind = mc3.radio("Show", ["Items", "Ability points"], horizontal=True)
         kind_key = "item" if kind == "Items" else "ability"
 
-        try:
-            by_player = load_match_ids(tuple(ids), days, match_mode)
-        except Exception as e:
-            by_player, _ = {}, st.error(f"Could not list matches: {e}")
-
-        every_match = sorted({m for v in by_player.values() for m in v},
-                             reverse=True)
-        if not every_match:
-            st.info("No matches for these players in this window.")
+        if stored:
+            st.caption(f"Store: {info['matches']} matches, {stored} purchases, "
+                       f"{info['megabytes']} MB, last synced {info['last_sync']}. "
+                       "Refresh it with `python store.py sync`.")
         else:
-            st.caption(f"{len(every_match)} matches in window; reading the "
-                       f"{min(how_many, len(every_match))} most recent.")
-            if st.button("Read matches"):
-                st.session_state.read_builds = True
+            st.caption("No local store yet — run `python store.py sync` to "
+                       "build one, then this reads from disk with no requests.")
 
-            if st.session_state.get("read_builds"):
-                labels_tuple = tuple((k, tuple(sorted(v.items())))
-                                     for k, v in sorted(labels.items()))
-                try:
-                    brows = load_match_builds(tuple(every_match), tuple(ids),
-                                              labels_tuple, how_many)
-                except Exception as e:
-                    brows, _ = [], st.error(f"Could not read matches: {e}")
+        labels_tuple = tuple((k, tuple(sorted(v.items())))
+                             for k, v in sorted(labels.items()))
+        brows = []
+        try:
+            if source == "Local store":
+                brows = load_store_builds(tuple(ids), labels_tuple, days)
+            else:
+                brows = load_bulk_builds(tuple(ids), labels_tuple, days,
+                                         match_mode, how_many)
+        except Exception as e:
+            st.error(f"Could not read builds: {e}")
 
-                if not brows:
-                    st.warning(
-                        "No purchases found in those matches. The metadata "
-                        "shape may differ from what this expects — the report "
-                        "below shows what one blob actually contains.")
-                    with st.expander("Metadata diagnostic"):
-                        try:
-                            st.json(metadata_report(every_match[0]))
-                        except Exception as e:
-                            st.write(f"(request failed: {e})")
-                else:
-                    summary = build_summary(brows, kind=kind_key)
-                    sframe = pd.DataFrame(summary)
-                    seen = sorted(sframe["player"].unique())
-                    st.caption(f"{len(brows)} purchases across "
-                               f"{len({r['match_id'] for r in brows})} matches, "
-                               f"{len(seen)} players.")
-                    who = st.multiselect("Players", seen, default=seen,
-                                         key="mb_players")
+        if not brows:
+            st.info("No purchases for these players in this window.")
+            if source != "Local store":
+                with st.expander("Metadata diagnostic"):
+                    st.caption("If matches exist but nothing parsed, the "
+                               "response shape differs from what this expects.")
+                    try:
+                        by_player = load_match_ids(tuple(ids), days, match_mode)
+                        first = next((m for v in by_player.values()
+                                      for m in v), None)
+                        st.json(metadata_report(first) if first
+                                else {"note": "no matches in window"})
+                    except Exception as e:
+                        st.write(f"(diagnostic failed: {e})")
+        else:
+            summary = build_summary(brows, kind=kind_key)
+            sframe = pd.DataFrame(summary)
+            seen = sorted(sframe["player"].unique()) if len(sframe) else []
+            st.caption(f"{len(brows)} purchases across "
+                       f"{len({r['match_id'] for r in brows})} matches, "
+                       f"{len(seen)} players.")
+            who = st.multiselect("Players", seen, default=seen,
+                                 key="mb_players")
+            if len(sframe):
+                st.dataframe(
+                    sframe[sframe["player"].isin(who)][
+                        ["player", "buy_time", "item", "buys", "matches",
+                         "win_rate"]],
+                    hide_index=True, use_container_width=True,
+                    column_config={
+                        "player": "Player",
+                        "buy_time": st.column_config.TextColumn(
+                            "Avg bought", width="small"),
+                        "item": "Item",
+                        "buys": st.column_config.NumberColumn("Buys"),
+                        "matches": st.column_config.NumberColumn("Games"),
+                        "win_rate": st.column_config.ProgressColumn(
+                            "Win rate", format="%.1f%%", min_value=0,
+                            max_value=100),
+                    })
+            st.download_button(
+                "Download match builds (CSV)",
+                pd.DataFrame(brows).to_csv(index=False).encode(),
+                file_name="match_builds.csv", mime="text/csv")
+
+            st.markdown("**One game at a time**")
+            played = sorted({r["match_id"] for r in brows}, reverse=True)
+            pick = st.selectbox("Match", played, key="mb_match")
+            in_match = sorted({(r["account_id"], r["player"]) for r in brows
+                               if r["match_id"] == pick})
+            for account_id, player in in_match:
+                seq = match_build_order(brows, pick, account_id, kind=kind_key)
+                if not seq:
+                    continue
+                hero = seq[0].get("hero") or "?"
+                won = seq[0].get("won")
+                tag = "" if won is None else (" · won" if won else " · lost")
+                with st.expander(f"{player} — {hero}{tag} "
+                                 f"({len(seq)} purchases)"):
                     st.dataframe(
-                        sframe[sframe["player"].isin(who)][
-                            ["player", "buy_time", "item", "buys", "matches",
-                             "win_rate"]],
+                        pd.DataFrame(seq)[["buy_time", "item"]],
                         hide_index=True, use_container_width=True,
                         column_config={
-                            "player": "Player",
                             "buy_time": st.column_config.TextColumn(
-                                "Avg bought", width="small"),
-                            "item": "Item",
-                            "buys": st.column_config.NumberColumn("Buys"),
-                            "matches": st.column_config.NumberColumn("Games"),
-                            "win_rate": st.column_config.ProgressColumn(
-                                "Win rate", format="%.1f%%", min_value=0,
-                                max_value=100),
-                        })
-                    st.download_button(
-                        "Download match builds (CSV)",
-                        pd.DataFrame(brows).to_csv(index=False).encode(),
-                        file_name="match_builds.csv", mime="text/csv")
-
-                    st.markdown("**One game at a time**")
-                    played = sorted({r["match_id"] for r in brows},
-                                    reverse=True)
-                    pick = st.selectbox("Match", played, key="mb_match")
-                    in_match = sorted({(r["account_id"], r["player"])
-                                       for r in brows
-                                       if r["match_id"] == pick})
-                    for account_id, player in in_match:
-                        seq = match_build_order(brows, pick, account_id,
-                                                kind=kind_key)
-                        if not seq:
-                            continue
-                        hero = seq[0].get("hero") or "?"
-                        won = seq[0].get("won")
-                        tag = "" if won is None else (" · won" if won
-                                                      else " · lost")
-                        with st.expander(f"{player} — {hero}{tag} "
-                                         f"({len(seq)} purchases)"):
-                            st.dataframe(
-                                pd.DataFrame(seq)[["buy_time", "item"]],
-                                hide_index=True, use_container_width=True,
-                                column_config={
-                                    "buy_time": st.column_config.TextColumn(
-                                        "At", width="small"),
-                                    "item": "Bought"})
-
-    # ---------------------------------------------------- transitions
-    else:
-        st.caption("From the flow graph's edges: when they bought the item on "
-                   "the left, what did they buy next.")
-        try:
-            edges = flow_edges(load_flow_raw(*key))
-        except Exception as e:
-            edges, _ = [], st.error(f"Could not load transitions: {e}")
-        if not edges:
-            st.info("No transitions at these filters — usually too few games.")
-        else:
-            eframe = pd.DataFrame(edges)
-            st.dataframe(
-                eframe.head(top_items)[["from", "to", "matches", "win_rate"]],
-                hide_index=True, use_container_width=True,
-                column_config={
-                    "from": "Bought", "to": "Then bought",
-                    "matches": st.column_config.NumberColumn("Games"),
-                    "win_rate": st.column_config.ProgressColumn(
-                        "Win rate", format="%.1f%%", min_value=0,
-                        max_value=100),
-                })
-            st.download_button("Download transitions (CSV)",
-                               eframe.to_csv(index=False).encode(),
-                               file_name="build_transitions.csv",
-                               mime="text/csv")
+                                "At", width="small"),
+                            "item": "Bought"})
 
     # ------------------------------------------------ per-player breakdown
     st.divider()

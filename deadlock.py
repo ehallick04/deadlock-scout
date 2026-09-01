@@ -1561,3 +1561,170 @@ def top_heroes_for(account_id, days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY,
         })
     rows.sort(key=lambda r: -r["matches"])
     return rows[:limit]
+
+
+# ---- bulk match metadata: many matches in one request
+
+MATCH_ID_KEYS = ("match_id", "id")
+START_KEYS = ("start_time", "start_time_s", "started_at")
+DURATION_KEYS = ("duration_s", "match_duration_s", "duration")
+
+
+def bulk_match_metadata(account_ids=(), days=DEFAULT_DAYS,
+                        match_mode=CUSTOMS_ONLY, limit=1000, match_ids=(),
+                        min_match_id=None, refresh=False, with_items=True):
+    """
+    /v1/matches/metadata -- up to 10,000 matches in ONE request, filtered by
+    the players in them. Ten requests a minute, against three an hour for the
+    per-match endpoint when it falls through to Steam.
+
+    -> the parsed array. bulk_build_rows() turns it into purchase rows.
+    """
+    params = {
+        "include_info": "true",
+        "include_player_info": "true",
+        "match_mode": match_mode or None,
+        "limit": max(1, min(int(limit), 10000)),
+        "order_by": "match_id",
+        "order_direction": "desc",
+    }
+    if with_items:
+        params["include_player_items"] = "true"
+    if account_ids:
+        params["account_ids"] = ",".join(str(a) for a in account_ids)
+    if match_ids:
+        params["match_ids"] = ",".join(str(m) for m in match_ids)
+    if min_match_id is not None:
+        params["min_match_id"] = int(min_match_id)
+    elif days:
+        params["min_unix_timestamp"] = int(time.time()) - days * 86400
+    return get_json("/v1/matches/metadata", refresh=refresh, **params)
+
+
+def _match_rows(match, account_ids=None, labels=None, names=None,
+                hero_lookup=None, ability_ids=None):
+    """Purchase rows for one match object from either metadata endpoint."""
+    labels = labels or {}
+    names = names or {}
+    hero_lookup = hero_lookup or {}
+    ability_ids = ability_ids or set()
+
+    mid = _pick(match, MATCH_ID_KEYS)
+    if mid is None:
+        mid = _find_scalar(match, *MATCH_ID_KEYS)
+    winner = _match_winner(match)
+    start = _pick(match, START_KEYS)
+
+    rows = []
+    for player in _walk_dicts(match):
+        account_id = player.get("account_id")
+        if not isinstance(account_id, int) or account_id <= 0:
+            continue
+        if account_ids is not None and account_id not in account_ids:
+            continue
+        entries = _item_entries(player)
+        if not entries:
+            continue
+
+        hero_id = player.get("hero_id")
+        team = _pick(player, TEAM_KEYS)
+        won = None
+        if winner is not None and isinstance(team, int):
+            won = (team == winner)
+        who = labels.get(account_id, {})
+
+        for e in entries:
+            item_id = _pick(e, ITEM_KEYS)
+            bought = _pick(e, ITEM_TIME_KEYS)
+            rows.append({
+                "match_id": mid,
+                "start_time": start,
+                "account_id": account_id,
+                "player": who.get("ign") or str(account_id),
+                "hero_id": hero_id,
+                "hero": hero_lookup.get(hero_id, ""),
+                "kind": "ability" if item_id in ability_ids else "item",
+                "item": names.get(item_id, f"item {item_id}"),
+                "item_id": item_id,
+                "bought_s": bought,
+                "buy_time": mmss(bought),
+                "sold_s": _pick(e, SOLD_TIME_KEYS) or None,
+                "won": won,
+            })
+    return rows
+
+
+def bulk_build_rows(raw, account_ids=(), labels=None, names=None,
+                    hero_lookup=None, ability_ids=None):
+    """
+    Purchase rows from a bulk metadata response. Same shape as
+    match_builds(), so everything downstream is unchanged.
+    """
+    if names is None:
+        try:
+            names = item_names()
+        except Exception:
+            names = {}
+    if hero_lookup is None:
+        try:
+            hero_lookup = hero_names()
+        except Exception:
+            hero_lookup = {}
+    if ability_ids is None:
+        try:
+            ability_ids = all_ability_ids()
+        except Exception:
+            ability_ids = set()
+
+    wanted = {int(a) for a in account_ids} if account_ids else None
+    matches = raw if isinstance(raw, list) else None
+    if matches is None:
+        matches = [raw] if isinstance(raw, dict) else []
+
+    rows = []
+    for match in matches:
+        if isinstance(match, dict):
+            rows.extend(_match_rows(match, wanted, labels, names, hero_lookup,
+                                    ability_ids))
+    rows.sort(key=lambda r: (r["match_id"] or 0, r["player"],
+                             r["bought_s"] or 0))
+    return rows
+
+
+def match_builds_bulk(account_ids=(), labels=None, days=DEFAULT_DAYS,
+                      match_mode=CUSTOMS_ONLY, limit=1000, refresh=False):
+    """One request in, purchase rows out."""
+    raw = bulk_match_metadata(account_ids, days, match_mode, limit,
+                              refresh=refresh)
+    return bulk_build_rows(raw, account_ids, labels)
+
+
+def bulk_matches(raw):
+    """Match-level rows from a bulk response, for the local store."""
+    matches = raw if isinstance(raw, list) else ([raw] if isinstance(raw, dict)
+                                                 else [])
+    out = []
+    for m in matches:
+        if not isinstance(m, dict):
+            continue
+        mid = _pick(m, MATCH_ID_KEYS) or _find_scalar(m, *MATCH_ID_KEYS)
+        if mid is None:
+            continue
+        players = []
+        for p in _walk_dicts(m):
+            account_id = p.get("account_id")
+            if isinstance(account_id, int) and account_id > 0:
+                players.append({"account_id": account_id,
+                                "hero_id": p.get("hero_id"),
+                                "team": _pick(p, TEAM_KEYS)})
+        out.append({
+            "match_id": mid,
+            "start_time": _pick(m, START_KEYS),
+            "duration_s": _pick(m, DURATION_KEYS),
+            "match_mode": m.get("match_mode"),
+            "game_mode": m.get("game_mode"),
+            "winning_team": _match_winner(m),
+            "average_badge": m.get("average_badge"),
+            "players": players,
+        })
+    return out

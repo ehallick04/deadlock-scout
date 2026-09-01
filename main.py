@@ -46,7 +46,8 @@ from deadlock import (
     WITH_CUSTOMS, build_report, build_team_report, composition_counts,
     ability_order, ability_rows, build_summary, buy_order,
     buy_order_by_player, custom_match_ids, flatten,
-    match_build_order, match_builds, metadata_report,
+    match_build_order, match_builds, match_builds_bulk,
+    metadata_report,
     top_heroes_for, typical_builds,
     flow_edges, flow_rows, get_rank, hero_names, hero_totals, item_flow,
     parse_ids, read_id_file,
@@ -483,40 +484,83 @@ def print_one_match(rows, match_id, kind=None):
 
 
 def match_builds_menu(ids, labels, days, match_mode):
-    """Builds read out of match metadata rather than the analytics endpoints."""
+    """
+    Builds read from real matches. Three sources, cheapest first:
+      local store  no requests at all
+      bulk         one request for up to 10,000 matches
+      per match    one request each; only worth it for a handful
+    """
     if not ids:
         print("  add some players first")
         return
-    try:
-        by_player = custom_match_ids(ids, days=days, match_mode=match_mode)
-    except Exception as e:
-        print(f"  could not list matches: {e}")
-        return
 
-    every = sorted({m for v in by_player.values() for m in v}, reverse=True)
-    if not every:
-        print("  no matches for these players in this window")
-        return
-
-    n = ask(f"  {len(every)} matches in window. read how many "
-            f"(blank = 20): ", "20")
-    limit = int(n) if n.isdigit() else 20
-    print(f"  reading {min(limit, len(every))} matches "
-          "(cached ones are instant) ...")
+    import store
     try:
-        rows = match_builds(every, account_ids=ids, labels=labels,
-                            limit=limit)
+        info = store.status()
+    except Exception:
+        info = {"purchases": 0}
+
+    options = []
+    if info.get("purchases"):
+        options.append(("local store", "store"))
+    options += [("bulk endpoint (1 request)", "bulk"),
+                ("one request per match", "each")]
+
+    print("\n  source:")
+    for i, (label, _) in enumerate(options, 1):
+        print(f"    {i}. {label}")
+    if info.get("purchases"):
+        print(f"    (store holds {info['matches']} matches, "
+              f"{info['purchases']} purchases, synced {info['last_sync']})")
+    else:
+        print("    (no local store — `python store.py sync` builds one)")
+
+    pick = ask("  number (blank = 1): ", "1")
+    how = options[int(pick) - 1][1] if (pick.isdigit()
+                                        and 1 <= int(pick) <= len(options)) \
+        else options[0][1]
+
+    rows = []
+    try:
+        if how == "store":
+            rows = store.purchases(ids, days=days, labels=labels)
+        elif how == "bulk":
+            n = ask("  match limit (blank = 1000): ", "1000")
+            limit = int(n) if n.isdigit() else 1000
+            print("  one request, up to "
+                  f"{min(limit, 10000)} matches ...")
+            rows = match_builds_bulk(ids, labels=labels, days=days,
+                                     match_mode=match_mode, limit=limit)
+        else:
+            by_player = custom_match_ids(ids, days=days, match_mode=match_mode)
+            every = sorted({m for v in by_player.values() for m in v},
+                           reverse=True)
+            if not every:
+                print("  no matches for these players in this window")
+                return
+            n = ask(f"  {len(every)} in window. read how many (blank = 20): ",
+                    "20")
+            limit = int(n) if n.isdigit() else 20
+            print(f"  reading {min(limit, len(every))} matches ...")
+            rows = match_builds(every, account_ids=ids, labels=labels,
+                                limit=limit)
     except Exception as e:
         print(f"  request failed: {e}")
         return
 
     if not rows:
-        print("  no purchases found. what one blob actually contains:")
-        try:
-            for k, v in metadata_report(every[0]).items():
-                print(f"    {k}: {v}")
-        except Exception as e:
-            print(f"    (diagnostic failed: {e})")
+        print("  no purchases found in this window")
+        if how != "store":
+            try:
+                print("  what one blob actually contains:")
+                by_player = custom_match_ids(ids, days=days,
+                                             match_mode=match_mode)
+                first = next((m for v in by_player.values() for m in v), None)
+                if first:
+                    for k, v in metadata_report(first).items():
+                        print(f"    {k}: {v}")
+            except Exception as e:
+                print(f"    (diagnostic failed: {e})")
         return
 
     print_match_builds(rows, kind="item")
@@ -524,11 +568,48 @@ def match_builds_menu(ids, labels, days, match_mode):
         print_match_builds(rows, kind="ability")
 
     played = sorted({r["match_id"] for r in rows}, reverse=True)
-    print(f"\n  matches read: {', '.join(str(m) for m in played[:12])}"
+    print(f"\n  matches: {', '.join(str(m) for m in played[:12])}"
           + (" ..." if len(played) > 12 else ""))
     want = ask("  show one match in full? (match id, blank = no): ")
     if want and want.isdigit() and int(want) in played:
         print_one_match(rows, int(want))
+
+
+def store_menu(ids, days, match_mode):
+    """Sync and inspect the local SQLite copy."""
+    import store
+    try:
+        info = store.status()
+    except Exception as e:
+        print(f"  store unavailable: {e}")
+        return
+
+    print(f"\n{'=' * 70}")
+    print("  LOCAL STORE")
+    print(f"{'=' * 70}")
+    for k, v in info.items():
+        print(f"  {k:12} {v}")
+
+    if not ask("\n  sync now? (y/N): ", "n").lower().startswith("y"):
+        return
+    if not ids:
+        from teams import PINNED, roster_many
+        ids, _ = roster_many(sorted(PINNED))
+        print(f"  no player list — syncing the {len(ids)} pinned pros")
+
+    conn = store.connect()
+    try:
+        if not store.get_meta(conn, "assets_synced"):
+            print("  syncing hero and item names ...")
+            print("   ", store.sync_assets(conn))
+        print(f"  syncing {len(ids)} players (one request) ...")
+        result = store.sync(ids, days=days, match_mode=match_mode, conn=conn)
+        for k, v in result.items():
+            print(f"  {k:12} {v}")
+    except Exception as e:
+        print(f"  sync failed: {e}")
+    finally:
+        conn.close()
 
 
 def pick_players(ids, labels):
@@ -750,6 +831,7 @@ def menu():
   I. Build order (items, phases, ability points)
   M. Builds from real matches (uses cached match data)
   S. Standard build for one player on one hero
+  D. Local data store (sync / status)
   1. Add players (ids or statlocker URLs)
   2. Load ids from a file
   3. Set time window        (now: last {days} days)
@@ -780,6 +862,9 @@ def menu():
 
         elif choice.lower() == "s":
             standard_build_menu(ids, {}, days, match_mode)
+
+        elif choice.lower() == "d":
+            store_menu(ids, days, match_mode)
 
         elif choice.lower() == "b":
             from roster_import import HARVESTER
