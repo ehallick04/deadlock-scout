@@ -396,7 +396,7 @@ def shared_match_ids(by_player, min_players=4):
 
 def _team_block(members, team_label, region, days, top, min_players,
                 match_mode, include_subs, min_sub_games, by_player, names,
-                labels=None):
+                labels=None, participants=None):
     """
     One team's report. `members` are that team's roster ids ONLY, so a pro
     from another team who stands in here is correctly seen as an outsider.
@@ -405,7 +405,15 @@ def _team_block(members, team_label, region, days, top, min_players,
 
     labels = labels or {}
     own = {aid: by_player.get(aid, set()) for aid in members}
-    shared, counts = shared_match_ids(own, min_players)
+    if participants:
+        # side-aware: `min_players` of THIS team on ONE side, not merely
+        # present in the lobby on opposite sides
+        candidates = {m for ms in own.values() for m in ms}
+        subset = {m: p for m, p in participants.items() if m in candidates}
+        shared, counts, _ = same_side_match_ids(subset, members, min_players,
+                                                labels)
+    else:
+        shared, counts = shared_match_ids(own, min_players)
 
     subs, participants = {}, {}
     rows = list(members)
@@ -504,7 +512,7 @@ def _team_block(members, team_label, region, days, top, min_players,
 
 def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
                       labels=None, match_mode=CUSTOMS_ONLY, include_subs=False,
-                      min_sub_games=1):
+                      min_sub_games=1, strict_sides=True):
     """
     Matches where a roster played together, computed PER TEAM.
 
@@ -525,7 +533,21 @@ def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
 
     by_player = custom_match_ids(account_ids, days, match_mode)
 
-    all_players, all_shared, all_counts, all_subs = [], set(), Counter(), {}
+    # One bulk request buys side information for every candidate match, which
+    # is what separates "six of them played together" from "three of them
+    # played against the other three".
+    participants = {}
+    if strict_sides:
+        candidates = sorted({m for ms in by_player.values() for m in ms})
+        if candidates:
+            participants = bulk_participants(candidates, account_ids,
+                                             match_mode=match_mode)
+
+    all_players, all_shared, all_subs = [], set(), {}
+    # counts stay keyed by (team, match). Merging them into one per-match
+    # tally adds a scrim's two rosters together and reports "12 players in a
+    # match", which cannot happen in a 6v6 game -- it is two teams of six.
+    team_counts = {}
     inspected = 0
 
     for team_label, members in groups.items():
@@ -533,11 +555,13 @@ def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
                        if labels.get(a)), "")
         players, shared, counts, subs, n = _team_block(
             members, team_label, region, days, top, min_players, match_mode,
-            include_subs, min_sub_games, by_player, names, labels)
+            include_subs, min_sub_games, by_player, names, labels,
+            participants)
 
         all_players += players
         all_shared |= shared
-        all_counts.update(counts)
+        for mid, n_members in counts.items():
+            team_counts[(team_label, mid)] = n_members
         inspected += n
         for aid, row in subs.items():
             all_subs.setdefault((aid, team_label), row["games"])
@@ -547,13 +571,48 @@ def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
     for p in all_players:
         p["persona_name"] = profiles.get(p["account_id"], {}).get("personaname", "")
 
+    # how many teams fielded a real group in each match
+    # only among matches that actually qualified -- two players from each of
+    # two teams in a pub lobby is not a scrim between those teams
+    per_match = {}
+    for (team_label, mid), n_members in team_counts.items():
+        if n_members >= 2 and mid in all_shared:
+            per_match.setdefault(mid, []).append((team_label, n_members))
+
+    matchups = Counter()
+    if participants:
+        # name both sides from who was actually on them, so a side split
+        # between two rosters reads "Melee creeps/Buff Enjoyers"
+        for mid in sorted(all_shared):
+            players = participants.get(mid)
+            if not players:
+                continue
+            by_side = {}
+            for account_id, info in players.items():
+                team = labels.get(account_id, {}).get("team", "")
+                if team:
+                    by_side.setdefault(info.get("team"), Counter())[team] += 1
+            named = [side_label(c) for _, c in sorted(by_side.items(),
+                                                      key=lambda kv: str(kv[0]))
+                     if c]
+            if len(named) > 1:
+                matchups[" vs ".join(named)] += 1
+    else:
+        for mid, entries in per_match.items():
+            if len(entries) > 1:
+                matchups[" vs ".join(sorted(t or "?" for t, _ in entries))] += 1
+
     meta = {
         "shared_matches": len(all_shared),
         "min_players": min_players,
-        "stack_sizes": dict(sorted(Counter(all_counts.values()).items(),
+        # one entry per team per match, so the number is players on ONE side
+        "stack_sizes": dict(sorted(Counter(team_counts.values()).items(),
                                    reverse=True)),
+        "matchups": dict(matchups.most_common()),
+        "internal_matches": sum(matchups.values()),
         "subs": {f"{aid}@{team}": n for (aid, team), n in all_subs.items()},
         "matches_inspected": inspected,
+        "sides_known": bool(participants),
         "teams": list(groups),
         "match_ids": sorted(all_shared),
     }
@@ -752,7 +811,8 @@ def match_compositions(match_ids, roster_ids=(), labels=None, limit=60,
         side_names = {}
         for side, group in sides.items():
             teams_seen = Counter(p["team"] for p in group if p["team"])
-            side_names[side] = teams_seen.most_common(1)[0][0] if teams_seen else ""
+            # a side can be half one roster and half another; name both
+            side_names[side] = side_label(teams_seen)
 
         out.append({
             "match_id": mid,
@@ -1776,3 +1836,99 @@ def bulk_matches(raw):
             "players": players,
         })
     return out
+
+
+# ---- sides: who actually played together, and what to call a mixed side
+
+def bulk_participants(match_ids, account_ids=(), days=None,
+                      match_mode=CUSTOMS_ONLY, refresh=False):
+    """
+    {match_id: {account_id: {'hero_id','team'}}} for many matches in ONE
+    request, via the bulk metadata endpoint. Falls back to {} if it fails,
+    and callers then use the lobby-level heuristic.
+    """
+    ids = list(match_ids)
+    if not ids:
+        return {}
+    out = {}
+    for chunk in range(0, len(ids), 1000):        # match_ids caps at 1000
+        try:
+            raw = bulk_match_metadata(account_ids, days=days,
+                                      match_mode=match_mode,
+                                      limit=1000,
+                                      match_ids=ids[chunk:chunk + 1000],
+                                      refresh=refresh, with_items=False)
+        except Exception:
+            continue
+        matches = raw if isinstance(raw, list) else [raw]
+        for m in matches:
+            if not isinstance(m, dict):
+                continue
+            mid = _pick(m, MATCH_ID_KEYS) or _find_scalar(m, *MATCH_ID_KEYS)
+            if mid is None:
+                continue
+            players = {}
+            for p in _walk_dicts(m):
+                account_id = p.get("account_id")
+                if isinstance(account_id, int) and account_id > 0:
+                    players[account_id] = {"hero_id": p.get("hero_id"),
+                                           "team": _pick(p, TEAM_KEYS)}
+            if players:
+                out[mid] = players
+    return out
+
+
+def side_label(teams, joiner="/"):
+    """
+    Name a side from a Counter of team -> members.
+
+    A side is not always one team: half Melee creeps and half Buff Enjoyers
+    is a real thing in scrims. When no single team has a plurality, every
+    team tied at the top is named, joined by `joiner`, rather than one being
+    picked arbitrarily.
+    """
+    if not teams:
+        return ""
+    top = max(teams.values())
+    return joiner.join(sorted(t for t, n in teams.items() if n == top and t))
+
+
+def same_side_counts(participants, members, labels=None):
+    """
+    For each match, the largest group of `members` that shared ONE side,
+    and how that side breaks down by team.
+
+    Counting a whole lobby instead treats two players on each side as a
+    four-stack, which is the opposite of a team game.
+
+    -> {match_id: {'count': n, 'side': side, 'teams': Counter}}
+    """
+    members = set(members)
+    labels = labels or {}
+    out = {}
+    for mid, players in participants.items():
+        sides = {}
+        for account_id, info in players.items():
+            if account_id in members:
+                sides.setdefault(info.get("team"), []).append(account_id)
+        if not sides:
+            continue
+        side = max(sides, key=lambda s: len(sides[s]))
+        teams = Counter(labels.get(a, {}).get("team", "") for a in sides[side])
+        out[mid] = {"count": len(sides[side]), "side": side, "teams": teams}
+    return out
+
+
+def same_side_match_ids(participants, members, min_players=4, labels=None):
+    """
+    Matches where at least `min_players` of `members` were on the same side.
+    -> (set of match ids, {match_id: count}, {match_id: side_label})
+    """
+    counts, names = {}, {}
+    keep = set()
+    for mid, info in same_side_counts(participants, members, labels).items():
+        counts[mid] = info["count"]
+        names[mid] = side_label(info["teams"])
+        if info["count"] >= min_players:
+            keep.add(mid)
+    return keep, counts, names

@@ -185,12 +185,21 @@ def run_team(ids, days, top, min_players, labels, csv_path=None,
                                       include_subs=include_subs)
 
     print(f"\n{'=' * 58}")
-    print(f"  TEAM GAMES ONLY — at least {min_players} roster members per match")
+    print(f"  TEAM GAMES ONLY — at least {min_players} roster members on one side")
     print(f"  {meta['shared_matches']} qualifying matches in the last {days} days")
+    if meta.get("sides_known"):
+        print("  (verified per side — split squads do not count as a stack)")
+    else:
+        print("  (sides unverified — counted by lobby, not by side)")
     if meta["stack_sizes"]:
-        sizes = "  ".join(f"{n} players: {c} matches"
+        sizes = "  ".join(f"{n}: {c} matches"
                           for n, c in meta["stack_sizes"].items())
-        print(f"  stack sizes across all their customs -> {sizes}")
+        print(f"  roster members on one side, per team per match -> {sizes}")
+    if meta.get("internal_matches"):
+        print(f"  {meta['internal_matches']} of these are between teams you "
+              "selected:")
+        for pair, n in list(meta.get("matchups", {}).items())[:8]:
+            print(f"    {pair}: {n}")
     if meta.get("subs"):
         print(f"  {len(meta['subs'])} stand-in(s) found across "
               f"{meta['matches_inspected']} inspected matches")

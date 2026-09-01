@@ -418,11 +418,26 @@ if meta:
     if meta.get("subs"):
         st.warning(f"**{len(meta['subs'])} stand-in(s)** detected across "
                    f"{meta['matches_inspected']} matches — shown with a SUB tag.")
-    st.info(f"**Team games only** — {meta['shared_matches']} matches with at "
-            f"least {meta['min_players']} of the selected players. "
-            f"Stack sizes across all their customs: "
-            + ", ".join(f"{n} players in {c} matches"
-                        for n, c in meta["stack_sizes"].items()))
+    sizes = ", ".join(f"{n} in {c} matches"
+                      for n, c in meta["stack_sizes"].items())
+    verified = meta.get("sides_known")
+    note = (f"**Team games only** — {meta['shared_matches']} matches with at "
+            f"least {meta['min_players']} roster members "
+            + ("**on the same side**" if verified
+               else "in the lobby (sides unverified)")
+            + f". Group sizes per team per match: {sizes}.")
+    if not verified:
+        note += ("\n\nSide data could not be fetched, so players split "
+                 "across opposing sides may be counted together.")
+    if meta.get("internal_matches"):
+        pairs = ", ".join(f"{k} ({v})"
+                          for k, v in list(meta["matchups"].items())[:6])
+        note += (f"\n\n{meta['internal_matches']} of those are between teams "
+                 f"you selected: {pairs}. A side drawn from more than one "
+                 "roster is named with both, joined by `/`. Each side counts "
+                 "for its own team, so one scrim appears once per team rather "
+                 "than as a single twelve-player group.")
+    st.info(note)
 
 WINRATE_COL = st.column_config.ProgressColumn(
     "Win rate", format="%.1f%%", min_value=0, max_value=100)
