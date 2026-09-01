@@ -22,7 +22,7 @@ from deadlock import (
     WITH_CUSTOMS, build_report, build_team_report, composition_counts,
     ABILITY_STYLES, ability_order, ability_rows, ability_slots,
     build_summary, buy_order, custom_match_ids, match_build_order,
-    match_builds, metadata_report,
+    match_builds, metadata_report, top_heroes_for, typical_builds,
     buy_order_by_player, flatten,
     flow_edges, flow_rows, hero_names, hero_totals, item_flow, match_compositions,
     parse_ids, phase_label,
@@ -201,6 +201,34 @@ if use_custom:
         if account_id not in labels:
             ids.append(account_id)
             labels[account_id] = {"ign": "", "team": "", "region": ""}
+
+# ---- narrow to individual players, once there is a roster to narrow
+if len(ids) > 1:
+    with st.sidebar.expander(f"Players ({len(ids)})", expanded=False):
+        st.caption("Untick to scout a subset. Everything downstream — "
+                   "reports, builds, matches — follows this.")
+
+        def _who(account_id):
+            info = labels.get(account_id, {})
+            name = info.get("ign") or str(account_id)
+            team = info.get("team") or ""
+            return f"{name}  ·  {team}" if team else name
+
+        if st.button("All / none", use_container_width=True,
+                     key="players_toggle"):
+            turn_on = not all(st.session_state.get(f"pl_{a}", True)
+                              for a in ids)
+            for a in ids:
+                st.session_state[f"pl_{a}"] = turn_on
+
+        kept = [a for a in ids
+                if st.checkbox(_who(a), value=True, key=f"pl_{a}")]
+
+    if kept and len(kept) < len(ids):
+        ids = kept
+        labels = {a: labels[a] for a in kept if a in labels}
+    elif not kept:
+        st.sidebar.warning("No players ticked — showing everyone.")
 
 if selections:
     st.sidebar.success(f"{len(ids)} players selected")
@@ -397,6 +425,30 @@ def load_buy_order(ids_tuple, hero_id, days, match_mode, min_matches):
     """Pooled buy order for everyone selected. One request."""
     return buy_order(list(ids_tuple), hero_id=hero_id, days=days,
                      match_mode=match_mode, min_matches=min_matches)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_buy_order_bucketed(ids_tuple, hero_id, days, match_mode, min_matches,
+                            bucket):
+    """One request, rows split by bucket (hero) instead of pooled."""
+    return buy_order(list(ids_tuple), hero_id=hero_id, days=days,
+                     match_mode=match_mode, min_matches=min_matches,
+                     bucket=bucket)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_typical_builds(ids_tuple, labels_tuple, hero_id, days, match_mode,
+                        min_matches, core_share):
+    """One request per player."""
+    labels = {k: dict(v) for k, v in labels_tuple}
+    return typical_builds(list(ids_tuple), hero_id, labels=labels, days=days,
+                          match_mode=match_mode, min_matches=min_matches,
+                          core_share=core_share)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_top_heroes(account_id, days, match_mode):
+    return top_heroes_for(account_id, days=days, match_mode=match_mode)
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -652,8 +704,13 @@ with tab_items:
         st.caption("From item-stats: every item these players bought, sorted "
                    "by the average clock time they bought it at. Reading down "
                    "the table is reading the build.")
+        split = st.checkbox(
+            "Split by hero", value=False,
+            help="Buckets the same single request by hero — no extra "
+                 "requests, one row set per hero they played.")
         try:
-            rows = load_buy_order(*key)
+            rows = (load_buy_order_bucketed(*key, "hero") if split
+                    else load_buy_order(*key))
         except Exception as e:
             rows, _ = [], st.error(f"Could not load buy order: {e}")
 
@@ -669,11 +726,13 @@ with tab_items:
         else:
             frame = pd.DataFrame(rows)
             st.caption(f"{len(frame)} items.")
+            cols = (["hero"] if split and frame["hero"].any() else []) + [
+                "buy_time", "item", "buys", "players", "win_rate"]
             st.dataframe(
-                frame.head(top_items)[
-                    ["buy_time", "item", "buys", "players", "win_rate"]],
+                frame.head(top_items)[cols],
                 hide_index=True, use_container_width=True,
                 column_config={
+                    "hero": st.column_config.TextColumn("Hero", width="small"),
                     "buy_time": st.column_config.TextColumn("Bought at",
                                                             width="small"),
                     "item": "Item",
@@ -735,10 +794,12 @@ with tab_items:
 
     # ------------------------------------------------- from real matches
     elif view == "From matches":
-        st.caption("Read straight out of each match's metadata: the actual "
-                   "purchases, in the actual games, on the hero they actually "
-                   "played. Finished matches are cached permanently, so any "
-                   "match already loaded costs nothing.")
+        st.caption("One game at a time, straight out of match metadata: the "
+                   "purchase sequence in a specific game against a specific "
+                   "lineup, with items and ability points on one clock. For "
+                   "**averages**, use Buy order instead — it covers a larger "
+                   "population and costs a fraction of the requests. This "
+                   "view is for the matchup, not the mean.")
 
         mc1, mc2 = st.columns([1, 1])
         how_many = whole_number(
@@ -909,6 +970,95 @@ with tab_items:
                                pframe.to_csv(index=False).encode(),
                                file_name="buy_order_by_player.csv",
                                mime="text/csv")
+
+    # ------------------------------------------------ a player's normal build
+    st.divider()
+    st.subheader("Standard build")
+    st.caption("What a player normally buys on one hero — the items they take "
+               "in most of their games, in buy order. One request per player.")
+
+    sb1, sb2 = st.columns([2, 1])
+    focus = sb1.selectbox(
+        "Player", ids,
+        format_func=lambda a: labels.get(a, {}).get("ign") or str(a),
+        key="sb_player")
+    core_share = whole_number(
+        sb2.text_input("Core threshold %", value="50"),
+        50, "Core threshold", minimum=1, maximum=100)
+
+    if focus is not None:
+        try:
+            played = load_top_heroes(focus, days, match_mode)
+        except Exception as e:
+            played, _ = [], st.error(f"Could not list their heroes: {e}")
+
+        if not played:
+            st.info("No heroes for that player in this window.")
+        else:
+            who = labels.get(focus, {}).get("ign") or str(focus)
+            choice = st.selectbox(
+                "Hero", played,
+                format_func=lambda h: (f"{h['hero']} — {h['matches']} games"
+                                       + (f", {h['win_rate']:.0f}%"
+                                          if h["win_rate"] is not None else "")),
+                key="sb_hero")
+            labels_tuple = tuple((k, tuple(sorted(v.items())))
+                                 for k, v in sorted(labels.items()))
+            try:
+                builds = load_typical_builds((focus,), labels_tuple,
+                                             choice["hero_id"], days,
+                                             match_mode, min_matches,
+                                             float(core_share))
+            except Exception as e:
+                builds, _ = [], st.error(f"Could not load that build: {e}")
+
+            if not builds or not (builds[0]["core"] or builds[0]["situational"]):
+                st.info(f"No item data for {who} on {choice['hero']} in this "
+                        "window.")
+            else:
+                build = builds[0]
+                st.markdown(f"**{who} — {choice['hero']}**  ·  "
+                            f"{choice['matches']} games in window")
+                cc, sc = st.columns(2)
+                with cc:
+                    st.markdown(f"**Core** — in {core_share}%+ of games")
+                    if build["core"]:
+                        st.dataframe(
+                            pd.DataFrame(build["core"])[
+                                ["buy_time", "item", "share", "win_rate"]],
+                            hide_index=True, use_container_width=True,
+                            column_config={
+                                "buy_time": st.column_config.TextColumn(
+                                    "At", width="small"),
+                                "item": "Item",
+                                "share": st.column_config.NumberColumn(
+                                    "Games", format="%.0f%%"),
+                                "win_rate": st.column_config.NumberColumn(
+                                    "WR", format="%.0f%%"),
+                            })
+                    else:
+                        st.caption("Nothing clears the threshold — lower it.")
+                with sc:
+                    st.markdown("**Situational** — everything else")
+                    if build["situational"]:
+                        st.dataframe(
+                            pd.DataFrame(build["situational"]).head(15)[
+                                ["buy_time", "item", "share", "win_rate"]],
+                            hide_index=True, use_container_width=True,
+                            column_config={
+                                "buy_time": st.column_config.TextColumn(
+                                    "At", width="small"),
+                                "item": "Item",
+                                "share": st.column_config.NumberColumn(
+                                    "Games", format="%.0f%%"),
+                                "win_rate": st.column_config.NumberColumn(
+                                    "WR", format="%.0f%%"),
+                            })
+                    else:
+                        st.caption("Nothing outside the core.")
+                st.caption(f"Share is out of {build['games']} — the most-bought "
+                           "item's count, since item-stats does not report "
+                           "games played directly.")
 
     # ------------------------------------------------ ability point order
     st.divider()

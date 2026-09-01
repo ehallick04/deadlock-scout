@@ -877,29 +877,41 @@ def _window(days, match_mode, min_matches, account_ids=(), hero_id=None,
 
 def buy_order(account_ids=(), hero_id=None, days=DEFAULT_DAYS,
               match_mode=CUSTOMS_ONLY, min_matches=1, refresh=False,
-              names=None):
+              names=None, bucket=None):
     """
     What gets bought, in the order it gets bought.
 
     Reads /v1/analytics/item-stats, which carries `avg_buy_time_s` per item,
     so sorting by it gives a real timeline rather than a bucket.
 
-    -> [{'item','item_id','buys','players','avg_buy_s','buy_time',
-         'buy_pct','wins','win_rate','avg_sell_s'}]
+    bucket groups the rows instead of pooling them -- "hero" is the useful
+    one here, since it splits a player's items by the hero they were on
+    without needing a request per hero.
+
+    -> [{'item','item_id','bucket','hero','buys','players','avg_buy_s',
+         'buy_time','buy_pct','wins','win_rate','avg_sell_s'}]
     """
-    raw = get_json("/v1/analytics/item-stats", refresh=refresh,
-                   **_window(days, match_mode, min_matches, account_ids,
-                             hero_id))
-    return buy_rows(raw, names)
+    params = _window(days, match_mode, min_matches, account_ids, hero_id)
+    if bucket:
+        params["bucket"] = bucket
+    raw = get_json("/v1/analytics/item-stats", refresh=refresh, **params)
+    return buy_rows(raw, names, bucket=bucket)
 
 
-def buy_rows(raw, names=None):
+def buy_rows(raw, names=None, bucket=None):
     """Normalise an item-stats response. Safe on an unexpected shape."""
     if names is None:
         try:
             names = item_names()
         except Exception:
             names = {}
+
+    hero_lookup = {}
+    if bucket == "hero":
+        try:
+            hero_lookup = hero_names()
+        except Exception:
+            hero_lookup = {}
 
     nodes = raw if isinstance(raw, list) else None
     if nodes is None:
@@ -915,9 +927,12 @@ def buy_rows(raw, names=None):
         games = _pick(n, COUNT_KEYS, 0) or 0
         wins = _pick(n, WIN_KEYS) or 0
         buy_s = n.get("avg_buy_time_s")
+        group = n.get("bucket")
         rows.append({
             "item": names.get(item_id, f"item {item_id}"),
             "item_id": item_id,
+            "bucket": group,
+            "hero": hero_lookup.get(group, "") if bucket == "hero" else "",
             "buys": games,
             "players": n.get("players"),
             "avg_buy_s": buy_s,
@@ -928,15 +943,17 @@ def buy_rows(raw, names=None):
             "win_rate": _win_rate(n, games, wins),
         })
 
-    # unknown buy time sorts last rather than first
-    rows.sort(key=lambda r: (r["avg_buy_s"] is None,
+    # group first when bucketed, then unknown buy time last
+    rows.sort(key=lambda r: (str(r["hero"] or r["bucket"] or ""),
+                             r["avg_buy_s"] is None,
                              r["avg_buy_s"] or 0, -r["buys"]))
     return rows
 
 
 def buy_order_by_player(account_ids, labels=None, hero_id=None,
                         days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY,
-                        min_matches=1, pause=ANALYTICS_PAUSE, refresh=False):
+                        min_matches=1, pause=ANALYTICS_PAUSE, refresh=False,
+                        bucket=None):
     """
     buy_order() computed one player at a time.
     -> the same rows, each carrying 'player' and 'account_id'.
@@ -951,7 +968,7 @@ def buy_order_by_player(account_ids, labels=None, hero_id=None,
     for account_id in account_ids:
         try:
             rows = buy_order([account_id], hero_id, days, match_mode,
-                             min_matches, refresh, names)
+                             min_matches, refresh, names, bucket=bucket)
         except urllib.error.HTTPError:
             continue
         who = labels.get(account_id, {})
@@ -1450,3 +1467,97 @@ def metadata_report(match_id):
         "purchases_found": len(_item_entries(sample)),
         "winner": _match_winner(md),
     }
+
+
+# ---- a player's standard build on a hero
+
+CORE_SHARE = 50.0        # bought in at least half their games = part of the build
+
+
+def typical_build(account_id, hero_id, days=DEFAULT_DAYS,
+                  match_mode=CUSTOMS_ONLY, min_matches=1, core_share=CORE_SHARE,
+                  refresh=False, names=None):
+    """
+    One player's normal build on one hero: the items they buy in at least
+    `core_share` percent of their games, in the order they buy them.
+
+    One request. The denominator is the largest per-item match count in the
+    response -- an item bought in nearly every game -- since item-stats does
+    not report how many games the player played.
+
+    -> {'account_id','hero_id','games','core': [...], 'situational': [...]}
+       where each entry is a buy_order row plus 'share'.
+    """
+    rows = buy_order([account_id], hero_id=hero_id, days=days,
+                     match_mode=match_mode, min_matches=min_matches,
+                     refresh=refresh, names=names)
+    games = max((r["buys"] for r in rows), default=0)
+
+    core, situational = [], []
+    for r in rows:
+        share = round(r["buys"] / games * 100, 1) if games else None
+        entry = {**r, "share": share}
+        if share is not None and share >= core_share:
+            core.append(entry)
+        else:
+            situational.append(entry)
+
+    situational.sort(key=lambda r: -(r["share"] or 0))
+    return {"account_id": account_id, "hero_id": hero_id, "games": games,
+            "core": core, "situational": situational}
+
+
+def typical_builds(account_ids, hero_id, labels=None, days=DEFAULT_DAYS,
+                   match_mode=CUSTOMS_ONLY, min_matches=1,
+                   core_share=CORE_SHARE, pause=ANALYTICS_PAUSE):
+    """typical_build() for several players. One request each."""
+    labels = labels or {}
+    try:
+        names = item_names()
+    except Exception:
+        names = {}
+
+    out = []
+    for account_id in account_ids:
+        try:
+            build = typical_build(account_id, hero_id, days, match_mode,
+                                  min_matches, core_share, names=names)
+        except urllib.error.HTTPError:
+            continue
+        who = labels.get(account_id, {})
+        build["player"] = who.get("ign") or str(account_id)
+        out.append(build)
+        time.sleep(pause)
+    return out
+
+
+def top_heroes_for(account_id, days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY,
+                   limit=8):
+    """
+    Which heroes this player actually plays, most games first. Used to offer
+    a sensible hero list instead of all of them.
+
+    -> [{'hero_id','hero','matches','wins','win_rate'}]
+    """
+    try:
+        lookup = hero_names()
+    except Exception:
+        lookup = {}
+    stats = hero_stats([account_id], days=days, match_mode=match_mode)
+    rows = []
+    for s in stats:
+        if s.get("account_id") != account_id:
+            continue
+        played = s.get("matches_played") or len(s.get("matches") or [])
+        if not played:
+            continue
+        wins = s.get("wins") or 0
+        rows.append({
+            "hero_id": s.get("hero_id"),
+            "hero": lookup.get(s.get("hero_id"), str(s.get("hero_id"))),
+            "matches": played,
+            "wins": wins,
+            "win_rate": round(wins / played * 100, 1) if played else None,
+        })
+    rows.sort(key=lambda r: -r["matches"])
+    return rows[:limit]

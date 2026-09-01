@@ -47,6 +47,7 @@ from deadlock import (
     ability_order, ability_rows, build_summary, buy_order,
     buy_order_by_player, custom_match_ids, flatten,
     match_build_order, match_builds, metadata_report,
+    top_heroes_for, typical_builds,
     flow_edges, flow_rows, get_rank, hero_names, hero_totals, item_flow,
     parse_ids, read_id_file,
 )
@@ -331,6 +332,10 @@ def pros_menu(days, top):
         selection = picks[int(pick) - 1]
     ids, labels = roster(selection)
 
+    if ask("  narrow to specific players? (y/N): ",
+           "n").lower().startswith("y"):
+        ids, labels = pick_players(ids, labels)
+
     d = ask(f"  days to look back (blank = {days}): ", str(days))
     days = int(d) if d and d.isdigit() else days
     t = ask(f"  heroes per player (blank = {top}): ", str(top))
@@ -377,9 +382,14 @@ def print_buy_order(rows, title="BUY ORDER", limit=40):
     print(f"\n{'=' * 70}")
     print(f"  {title}")
     print(f"{'=' * 70}")
+    split = any(r.get("hero") for r in rows)
     print(f"  {'bought':>7}  {'item':<30}{'buys':>6}{'WR':>9}")
     print(f"  {'-' * 60}")
+    hero = object()
     for r in rows[:limit]:
+        if split and r.get("hero") != hero:
+            hero = r.get("hero")
+            print(f"\n  {hero or '(unknown hero)'}")
         wr = f"{r['win_rate']:.1f}%" if r["win_rate"] is not None else "-"
         print(f"  {r['buy_time']:>7}  {r['item']:<30}{r['buys']:>6}{wr:>9}")
 
@@ -521,6 +531,105 @@ def match_builds_menu(ids, labels, days, match_mode):
         print_one_match(rows, int(want))
 
 
+def pick_players(ids, labels):
+    """
+    Narrow a roster to specific players.
+    -> (ids, labels), unchanged when the answer is blank.
+    """
+    if len(ids) < 2:
+        return ids, labels
+    print("\n  players:")
+    for i, account_id in enumerate(ids, 1):
+        info = labels.get(account_id, {})
+        name = info.get("ign") or str(account_id)
+        team = info.get("team") or ""
+        print(f"    {i:>2}. {name}" + (f"  [{team}]" if team else ""))
+
+    want = ask("  numbers to keep, comma separated (blank = all): ")
+    if not want:
+        return ids, labels
+    keep = []
+    for part in want.replace(",", " ").split():
+        if part.isdigit() and 1 <= int(part) <= len(ids):
+            keep.append(ids[int(part) - 1])
+    if not keep:
+        print("  nothing valid picked — keeping everyone")
+        return ids, labels
+    keep = list(dict.fromkeys(keep))
+    print(f"  keeping {len(keep)}: "
+          + ", ".join(labels.get(a, {}).get("ign") or str(a) for a in keep))
+    return keep, {a: labels[a] for a in keep if a in labels}
+
+
+def standard_build_menu(ids, labels, days, match_mode):
+    """One player's normal build on one hero."""
+    if not ids:
+        print("  add some players first")
+        return
+    picked, picked_labels = pick_players(ids, labels)
+    focus = picked[0]
+    if len(picked) > 1:
+        print("  (using the first of those)")
+    who = picked_labels.get(focus, labels.get(focus, {})).get("ign") or str(focus)
+
+    try:
+        played = top_heroes_for(focus, days=days, match_mode=match_mode)
+    except Exception as e:
+        print(f"  could not list their heroes: {e}")
+        return
+    if not played:
+        print(f"  no heroes for {who} in this window")
+        return
+
+    print(f"\n  {who} played:")
+    for i, h in enumerate(played, 1):
+        wr = f"{h['win_rate']:.0f}%" if h["win_rate"] is not None else "-"
+        print(f"    {i:>2}. {h['hero']:<16}{h['matches']:>4} games{wr:>8}")
+    pick = ask("  number (blank = most played): ", "1")
+    if not pick.isdigit() or not 1 <= int(pick) <= len(played):
+        pick = "1"
+    hero = played[int(pick) - 1]
+
+    share = ask("  core threshold %% (blank = 50): ", "50")
+    core_share = float(share) if share.replace(".", "", 1).isdigit() else 50.0
+
+    try:
+        builds = typical_builds([focus], hero["hero_id"], labels=labels,
+                                days=days, match_mode=match_mode,
+                                core_share=core_share)
+    except Exception as e:
+        print(f"  request failed: {e}")
+        return
+    if not builds:
+        print("  nothing came back")
+        return
+
+    build = builds[0]
+    print(f"\n{'=' * 70}")
+    print(f"  STANDARD BUILD — {who} on {hero['hero']} "
+          f"({hero['matches']} games)")
+    print(f"{'=' * 70}")
+    print(f"\n  core (in {core_share:.0f}%+ of games)")
+    print(f"  {'-' * 56}")
+    if build["core"]:
+        for r in build["core"]:
+            wr = f"{r['win_rate']:.0f}%" if r["win_rate"] is not None else "-"
+            print(f"    {r['buy_time']:>6}  {r['item']:<28}"
+                  f"{r['share']:>6.0f}%{wr:>8}")
+    else:
+        print("    nothing clears the threshold — try a lower one")
+
+    if build["situational"]:
+        print("\n  situational")
+        print(f"  {'-' * 56}")
+        for r in build["situational"][:12]:
+            wr = f"{r['win_rate']:.0f}%" if r["win_rate"] is not None else "-"
+            print(f"    {r['buy_time']:>6}  {r['item']:<28}"
+                  f"{r['share']:>6.0f}%{wr:>8}")
+    print(f"\n  share is out of {build['games']} — the most-bought item's "
+          "count, since\n  item-stats does not report games played directly")
+
+
 def pick_hero():
     """-> (hero_id, label). Blank means every hero pooled."""
     want = ask("  one hero only? (name, blank = all): ")
@@ -552,11 +661,14 @@ def item_order_menu(ids, labels, days, match_mode):
     mm = ask("  min matches per item (blank = 1): ", "1")
     min_matches = int(mm) if mm.isdigit() else 1
 
+    split = ask("  split by hero? (y/N): ", "n").lower().startswith("y")
+
     print(f"  pulling build data for {len(ids)} player(s), {hero_label}, "
           f"last {days} days ...")
     try:
         rows = buy_order(ids, hero_id=hero_id, days=days,
-                         match_mode=match_mode, min_matches=min_matches)
+                         match_mode=match_mode, min_matches=min_matches,
+                         bucket="hero" if split else None)
     except Exception as e:
         print(f"  request failed: {e}")
         return
@@ -587,6 +699,10 @@ def item_order_menu(ids, labels, days, match_mode):
                 f"{hero_label} ({style.lower()})")
         except Exception as e:
             print(f"  ability request failed: {e}")
+
+    if ask("\n  show one player's standard build on a hero? (y/N): ",
+           "n").lower().startswith("y"):
+        standard_build_menu(ids, labels, days, match_mode)
 
     if not ask("\n  break the buy order down per player? (y/N): ",
                "n").lower().startswith("y"):
@@ -633,6 +749,7 @@ def menu():
   B. Bake in every league team (harvester bookmarklet)
   I. Build order (items, phases, ability points)
   M. Builds from real matches (uses cached match data)
+  S. Standard build for one player on one hero
   1. Add players (ids or statlocker URLs)
   2. Load ids from a file
   3. Set time window        (now: last {days} days)
@@ -660,6 +777,9 @@ def menu():
 
         elif choice.lower() == "m":
             match_builds_menu(ids, {}, days, match_mode)
+
+        elif choice.lower() == "s":
+            standard_build_menu(ids, {}, days, match_mode)
 
         elif choice.lower() == "b":
             from roster_import import HARVESTER
