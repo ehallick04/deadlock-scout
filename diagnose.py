@@ -15,7 +15,8 @@ import sys
 
 from api import get_json
 from deadlock import (CUSTOMS_ONLY, DEFAULT_DAYS, TEAM_KEYS, WINNER_KEYS,
-                      _walk_dicts, winner_offset)
+                      _walk_dicts, norm_side, player_won, winner_offset,
+                      winning_side)
 
 CANDIDATE_WINNER = ("winning_team", "match_winner", "winner", "match_result",
                     "match_outcome", "team_winner", "result")
@@ -62,8 +63,10 @@ def probe(account_ids, days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY):
         players = [d for d in _walk_dicts(first)
                    if isinstance(d.get("account_id"), int)
                    and d["account_id"] > 0]
-        sides = sorted({p.get(k) for p in players for k in CANDIDATE_SIDE
-                        if isinstance(p.get(k), int)})
+        # normalised, so "Team0"/"Team1" show up as 0/1 rather than being
+        # skipped for not being ints
+        sides = sorted({norm_side(p.get("team")) for p in players
+                        if norm_side(p.get("team")) is not None})
 
         report[label] = {
             "matches": len(matches),
@@ -83,12 +86,17 @@ def probe(account_ids, days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY):
             by_side = {}
             for p in _walk_dicts(m):
                 if isinstance(p.get("account_id"), int) and p["account_id"] > 0:
-                    by_side.setdefault(p.get("team"), []).append(p["account_id"])
-            win = next((m[k] for k in CANDIDATE_WINNER if k in m), None)
-            lineups.append({"winner": win, "sides": by_side})
+                    by_side.setdefault(norm_side(p.get("team")), []).append(
+                        p["account_id"])
+            lineups.append({"winner": winning_side(m), "sides": by_side})
+
+        decided = sum(1 for p in players if player_won(p) is not None)
+        report[label]["players_with_own_outcome"] = decided
+        report[label]["winning_side_resolved"] = [m["winner"] for m in lineups]
         report[label]["winner_offset"] = winner_offset(lineups)
         report[label]["verdict"] = (
-            "outcomes resolve" if report[label]["winner_offset"] is not None
+            "outcomes resolve"
+            if any(m["winner"] is not None for m in lineups)
             else "NO usable outcome field found — win rates will be blank")
 
     return report

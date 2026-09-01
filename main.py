@@ -45,9 +45,12 @@ from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
     WITH_CUSTOMS, ability_order, ability_rows, build_report, build_summary,
     build_team_report, buy_order, buy_order_by_player, composition_counts,
-    custom_match_ids, flatten, flow_edges, flow_rows, get_rank, hero_names,
+    custom_match_ids, flatten, flow_edges, flow_rows, get_rank,
     hero_totals, item_flow, match_build_order, match_builds,
-    bulk_lineups, hero_combos, hero_matchups, lineup_teams,
+    playable_hero_names,
+    bulk_lineups, drop_report, hero_combos, hero_matchups,
+    hero_swaps,
+    lineup_teams,
     match_builds_bulk, metadata_report, mirror_matches, parse_ids,
     read_id_file, top_heroes_for, typical_builds,
 )
@@ -201,6 +204,12 @@ def run_team(ids, days, top, min_players, labels, csv_path=None,
               "selected:")
         for pair, n in list(meta.get("matchups", {}).items())[:8]:
             print(f"    {pair}: {n}")
+    for team, rec in sorted((meta.get("team_records") or {}).items()):
+        if not rec.get("matches"):
+            continue
+        wr = f"{rec['win_rate']:.1f}%" if rec["win_rate"] is not None else "-"
+        print(f"  {team or '(no team)':<22}{rec['matches']:>4} matches"
+              f"{rec['wins']:>5} wins{wr:>9}")
     if meta.get("subs"):
         print(f"  {len(meta['subs'])} stand-in(s) found across "
               f"{meta['matches_inspected']} inspected matches")
@@ -667,22 +676,97 @@ def print_comps(rows, size, limit=20):
         print(f"    {r['heroes']:<38}{r['games']:>4}{share:>8}{wr:>8}")
 
 
-def print_matchups(rows, limit=25, hero=None):
+def print_matchups(rows, limit=25, hero=None, only_real=True):
+    """
+    Observed against chance. With no draft, co-occurrence is mostly the
+    product of pick rates -- the excess column is what actually means
+    something.
+    """
     rows = [r for r in rows if not hero or r["hero"].lower() == hero.lower()]
+    if only_real:
+        rows = [r for r in rows if r.get("significant")]
     if not rows:
-        print("  no matchup clears the threshold")
+        print("  nothing above chance here — the expected result in a game "
+              "without a draft")
         return
-    print(f"\n{'=' * 70}")
-    print("  MATCHUPS — what shows up on the other side")
-    print(f"{'=' * 70}")
-    print(f"  {'picked':<14}{'faced':<14}{'games':>7}{'picks':>7}"
-          f"{'answer':>9}{'WR':>7}")
-    print(f"  {'-' * 62}")
+    print(f"\n{'=' * 74}")
+    print("  MATCHUPS — what shows up opposite, above what chance predicts")
+    print(f"{'=' * 74}")
+    print(f"  {'picked':<13}{'faced':<13}{'games':>7}{'seen':>8}"
+          f"{'chance':>8}{'excess':>8}{'WR':>7}")
+    print(f"  {'-' * 66}")
     for r in rows[:limit]:
         wr = f"{r['win_rate']:.0f}%" if r["win_rate"] is not None else "-"
-        rate = f"{r['answer_rate']:.0f}%" if r["answer_rate"] is not None else "-"
-        print(f"  {r['hero']:<14}{r['answer']:<14}{r['games']:>7}"
-              f"{r['picks']:>7}{rate:>9}{wr:>7}")
+        obs = f"{r['answer_rate']:.0f}%" if r["answer_rate"] is not None else "-"
+        exp = f"{r['expected_rate']:.0f}%" if r["expected_rate"] is not None else "-"
+        exc = f"{r['excess']:+.0f}%" if r["excess"] is not None else "-"
+        print(f"  {r['hero']:<13}{r['answer']:<13}{r['games']:>7}{obs:>8}"
+              f"{exp:>8}{exc:>8}{wr:>7}")
+
+
+def print_soft_bans(lineups, min_locks=10):
+    """Drops, split into denials and reactions."""
+    rows, summary, triggers = drop_report(lineups, min_locks=min_locks)
+    if not rows:
+        print("\n  not enough pre-game data for drop analysis")
+        return
+    print(f"\n{'=' * 80}")
+    print("  REFUSED ASSIGNMENTS — heroes handed out, then dropped")
+    print(f"{'=' * 80}")
+    print(f"  baseline {summary['overall_away_rate']}% of "
+          f"{summary['players_with_pregame']} locks    "
+          f"{summary['drops']} drops: {summary['denials_held']} stayed "
+          f"unplayed, {summary['picked_up_by_teammate']} taken by a "
+          f"teammate, {summary['picked_up_by_enemy']} by an enemy")
+    if summary["matches_skipped_not_swappable"]:
+        print(f"  {summary['matches_skipped_not_swappable']} matches skipped "
+              "— the face-off phase is ranked only")
+    if summary["duplicate_hero_matches"]:
+        print(f"  WARNING: {summary['duplicate_hero_matches']} matches show a "
+              "hero twice, which the rules forbid")
+
+    print(f"  the starting hero is assigned from a priority list, so a drop "
+          "usually\n  means a hero further down someone's own list")
+    print(f"\n  average hero win rate: {summary.get('average_win_rate')}% "
+          "— below it, a drop is avoidance, not denial")
+    print(f"\n  {'hero':<14}{'given':>7}{'dropped':>9}{'rate':>7}{'WR':>8}"
+          f"{'unplayed':>10}  reads as")
+    print(f"  {'-' * 80}")
+    for r in rows[:20]:
+        st = f"{r['stuck_rate']:.0f}%" if r["stuck_rate"] is not None else "-"
+        wr = f"{r['hero_win_rate']}%" if r["hero_win_rate"] is not None else "-"
+        print(f"  {r['hero']:<14}{r['locked']:>7}{r['swapped_away']:>9}"
+              f"{r['away_rate']:>6}%{wr:>8}{st:>10}  {r['reads_as']}")
+
+    real = [t for t in triggers if t["significant"] and t["excess"] > 0]
+    if real:
+        print(f"\n  COUNTER-SWAPS  (vs the enemy's loaded-in heroes)")
+        print(f"  {'-' * 66}")
+        for t in real[:12]:
+            print(f"  {t['hero']:<12} dropped {t['rate_seen']:>5.1f}% facing "
+                  f"{t['trigger']:<12} vs {t['rate_unseen']:>5.1f}% otherwise"
+                  f"  ({t['excess']:+.0f}%)")
+
+
+def print_swaps(lineups):
+    """Who changed hero in the pre-game window, and to what."""
+    rows, summary = hero_swaps(lineups, min_games=2)
+    if not summary["with_pregame_data"]:
+        print("\n  no pre-game hero data in these matches")
+        return
+    print(f"\n{'=' * 70}")
+    print("  PRE-GAME SWAPS — the only reactive mechanic in the game")
+    print(f"{'=' * 70}")
+    print(f"  {summary['swap_rate']}% of players swapped "
+          f"({summary['swaps']} of {summary['with_pregame_data']} with data)")
+    if not rows:
+        print("  no swap repeated often enough to list")
+        return
+    print(f"\n  {'locked':<16}{'switched to':<16}{'times':>7}{'share':>8}")
+    print(f"  {'-' * 48}")
+    for r in rows[:20]:
+        share = f"{r['share']:.0f}%" if r["share"] is not None else "-"
+        print(f"  {r['from']:<16}{r['to']:<16}{r['count']:>7}{share:>8}")
 
 
 def comps_menu(ids, labels, days, match_mode):
@@ -726,7 +810,97 @@ def comps_menu(ids, labels, days, match_mode):
     if ask("\n  show matchups too? (Y/n): ", "y").lower().startswith("y"):
         rows = hero_matchups(lineups, min_games=min_games)
         hero = ask("  one hero only? (name, blank = all): ")
-        print_matchups(rows, hero=hero or None)
+        raw = ask("  include pairings that are just chance? (y/N): ", "n")
+        print_matchups(rows, hero=hero or None,
+                       only_real=not raw.lower().startswith("y"))
+
+    if ask("\n  show pre-game swaps and soft bans? (Y/n): ",
+           "y").lower().startswith("y"):
+        print_soft_bans(lineups)
+        print_swaps(lineups)
+
+
+def synergy_menu(days):
+    """Ladder-wide hero synergy, with the significance testing that matters."""
+    import synergy
+
+    from deadlock import badge_label, rank_tiers
+
+    d = ask(f"  days to look at (blank = 30): ", "30")
+    window = int(d) if d.isdigit() else 30
+
+    tiers = rank_tiers()
+    print("\n  ranks:")
+    for tier, name in tiers.items():
+        print(f"    {tier:>2}. {name}")
+    t = ask(f"  minimum rank number (blank = 9, Phantom): ", "9")
+    tier = int(t) if t.isdigit() and int(t) in tiers else 9
+    sr = ask("  subrank 1-6 (blank = 1): ", "1")
+    subrank = int(sr) if sr.isdigit() and 1 <= int(sr) <= 6 else 1
+    badge = tier * 10 + subrank
+    print(f"  -> {badge_label(badge)} and above")
+    g = ask("  minimum games per pair (blank = 50): ", "50")
+    min_matches = int(g) if g.isdigit() else 50
+
+    print("  two requests, then the maths ...")
+    try:
+        pairs, heroes, context = synergy.report(
+            days=window, badge=badge, min_matches=min_matches)
+    except Exception as e:
+        print(f"  request failed: {e}")
+        return
+    if not pairs:
+        print("  no pairs cleared the filters — lower the minimum games, "
+              "widen the window, or drop the badge floor")
+        return
+
+    print(f"\n{'=' * 70}")
+    print(f"  HERO SYNERGY — {context['min_rank']}+, last {window} days")
+    print(f"{'=' * 70}")
+    print(f"  {context['pairs_tested']} pairs tested across "
+          f"{context['heroes']} heroes, {context['significant_pairs']} "
+          f"significant after FDR correction")
+    print(f"  {context.get('matches_in_pairs', 0):,} games behind those pairs")
+    print(f"  (uncorrected, roughly "
+          f"{int(context['pairs_tested'] * context['alpha'])} would pass by "
+          "chance alone)")
+
+    print(f"\n  BEST PAIRS")
+    print(f"  {'pair':<30}{'games':>7}{'actual':>9}{'exp':>8}{'lift':>8}  sig")
+    print(f"  {'-' * 68}")
+    for r in pairs[:12]:
+        print(f"  {r['hero_a'] + ' + ' + r['hero_b']:<30}{r['matches']:>7}"
+              f"{r['win_rate']:>8.1f}%{r['expected']:>7.1f}%"
+              f"{r['lift']:>+7.1f}%  {'yes' if r['significant'] else ''}")
+
+    print(f"\n  WORST PAIRS")
+    for r in pairs[-8:][::-1]:
+        print(f"  {r['hero_a'] + ' + ' + r['hero_b']:<30}{r['matches']:>7}"
+              f"{r['win_rate']:>8.1f}%{r['expected']:>7.1f}%"
+              f"{r['lift']:>+7.1f}%  {'yes' if r['significant'] else ''}")
+
+    print(f"\n  META DEFINING")
+    flagged = [h for h in heroes if h["meta_defining"]]
+    if not flagged:
+        print("    nothing clears the bar — a balanced patch looks like this")
+    for h in flagged:
+        print(f"    {h['hero']:<16}avg {h['avg_lift']:+.2f}%  lifts "
+              f"{h['significant_up']} of {h['pairs']} partners  "
+              f"({h['games']} games)")
+
+    want = ask("\n  show one hero's pairings? (name, blank = no): ")
+    if want:
+        hits = [r for r in pairs
+                if want.lower() in (r["hero_a"] + r["hero_b"]).lower()]
+        if not hits:
+            print("  no pairing matched that name")
+            return
+        print(f"\n  {want} pairings, best first")
+        print(f"  {'-' * 68}")
+        for r in hits[:20]:
+            print(f"  {r['hero_a'] + ' + ' + r['hero_b']:<30}{r['matches']:>7}"
+                  f"{r['win_rate']:>8.1f}%{r['lift']:>+8.1f}%"
+                  f"  {'yes' if r['significant'] else ''}")
 
 
 def pick_players(ids, labels):
@@ -834,7 +1008,7 @@ def pick_hero():
     if not want:
         return None, "all heroes"
     try:
-        names = hero_names()
+        names = playable_hero_names()      # no in-development or disabled
     except Exception as e:
         print(f"  (could not load hero names: {e})")
         return None, "all heroes"
@@ -950,6 +1124,7 @@ def menu():
   S. Standard build for one player on one hero
   D. Local data store (sync / status)
   K. Comps and matchups (who plays with / against what)
+  Y. Hero synergy across the ladder (meta defining)
   1. Add players (ids or statlocker URLs)
   2. Load ids from a file
   3. Set time window        (now: last {days} days)
@@ -986,6 +1161,9 @@ def menu():
 
         elif choice.lower() == "k":
             comps_menu(ids, {}, days, match_mode)
+
+        elif choice.lower() == "y":
+            synergy_menu(days)
 
         elif choice.lower() == "b":
             from roster_import import HARVESTER

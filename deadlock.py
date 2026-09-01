@@ -8,6 +8,7 @@ write them to a database, and neither one has to change this file.
     from deadlock import build_report, rank_name
 """
 
+import math
 import os
 import re
 import time
@@ -136,8 +137,49 @@ def heroes(refresh=False):
 
 
 def hero_names(refresh=False):
-    """{hero_id: name}"""
+    """
+    {hero_id: name} for EVERY hero in the assets, playable or not.
+
+    Kept complete on purpose: an old match may feature a hero since disabled,
+    and it should still get a name rather than showing as "hero 31".
+    Use playable_hero_ids() to decide what belongs in a picker or an
+    analysis.
+    """
     return {h["id"]: h.get("name") or h.get("class_name") for h in heroes(refresh)}
+
+
+# Assets carry heroes that are not in the game: in development, disabled,
+# testing-only. They have little or no match data, so they clutter pickers
+# and — worse — give an analysis a baseline built on a handful of games.
+UNPLAYABLE_FLAGS = ("disabled", "in_development", "needs_testing",
+                    "limited_testing", "prerelease_only",
+                    "assigned_players_only")
+
+
+def playable_heroes(refresh=False):
+    """Only the heroes actually in the game. -> [hero asset dicts]"""
+    out = []
+    for h in heroes(refresh):
+        if not isinstance(h, dict) or h.get("id") is None:
+            continue
+        if any(h.get(flag) for flag in UNPLAYABLE_FLAGS):
+            continue
+        # explicit False means "not selectable"; a missing key is not a veto,
+        # since the asset shape has changed before
+        if h.get("player_selectable") is False:
+            continue
+        out.append(h)
+    return out
+
+
+def playable_hero_ids(refresh=False):
+    return {h["id"] for h in playable_heroes(refresh)}
+
+
+def playable_hero_names(refresh=False):
+    """{hero_id: name}, playable only -- what a picker should offer."""
+    return {h["id"]: h.get("name") or h.get("class_name")
+            for h in playable_heroes(refresh)}
 
 
 # --------------------------------------------------------------- hero stats
@@ -602,8 +644,33 @@ def build_team_report(account_ids, days=DEFAULT_DAYS, top=5, min_players=4,
             if len(entries) > 1:
                 matchups[" vs ".join(sorted(t or "?" for t, _ in entries))] += 1
 
+    # Distinct matches per team, with wins. Summing the per-player rows
+    # instead counts a six-player scrim six times over, which is where "60
+    # matches" comes from when a team has played ten.
+    team_records = {}
+    for (team_label, mid), _n in team_counts.items():
+        rec = team_records.setdefault(team_label, {
+            "matches": 0, "wins": 0, "decided": 0, "match_ids": []})
+        if mid not in all_shared:
+            continue
+        rec["matches"] += 1
+        rec["match_ids"].append(mid)
+        outcomes = [info.get("won")
+                    for aid, info in (participants.get(mid) or {}).items()
+                    if labels.get(aid, {}).get("team", "") == team_label
+                    and info.get("won") is not None]
+        if outcomes:
+            rec["decided"] += 1
+            if sum(1 for w in outcomes if w) * 2 >= len(outcomes):
+                rec["wins"] += 1
+    for rec in team_records.values():
+        rec["win_rate"] = (round(rec["wins"] / rec["decided"] * 100, 1)
+                           if rec["decided"] else None)
+        rec["match_ids"] = sorted(rec["match_ids"])
+
     meta = {
         "shared_matches": len(all_shared),
+        "team_records": team_records,
         "min_players": min_players,
         # one entry per team per match, so the number is players on ONE side
         "stack_sizes": dict(sorted(Counter(team_counts.values()).items(),
@@ -664,7 +731,8 @@ def match_participants(match_ids, limit=60, pause=0.05):
             if isinstance(aid, int) and aid > 0:
                 players[aid] = {
                     "hero_id": node.get("hero_id"),
-                    "team": node.get("team", node.get("player_team")),
+                    "team": norm_side(node.get("team",
+                                               node.get("player_team"))),
                 }
         if players:
             out[mid] = players
@@ -1406,13 +1474,14 @@ def _item_entries(player):
 
 
 def _match_winner(md):
-    """The winning team number, if the blob names one."""
-    for d in _walk_dicts(md):
-        for key in WINNER_KEYS:
-            v = d.get(key)
-            if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 10:
-                return v
-    return None
+    """
+    The winning side as an int, whatever the blob calls it.
+
+    Values arrive as strings ("Team1"), so everything is normalised before
+    being returned; a raw comparison against a player's side would never
+    match.
+    """
+    return winning_side(md)
 
 
 def match_builds(match_ids, account_ids=(), labels=None, limit=60,
@@ -1454,11 +1523,7 @@ def match_builds(match_ids, account_ids=(), labels=None, limit=60,
         except urllib.error.HTTPError:
             continue
 
-        winner = _match_winner(md)
-        side_keys = {_pick(p, TEAM_KEYS) for p in _walk_dicts(md)
-                     if isinstance(p.get("account_id"), int)
-                     and p["account_id"] > 0}
-        side_keys = {k for k in side_keys if isinstance(k, int)}
+        champ = winning_side(md)
         for player in _walk_dicts(md):
             account_id = player.get("account_id")
             if not isinstance(account_id, int) or account_id <= 0:
@@ -1471,12 +1536,10 @@ def match_builds(match_ids, account_ids=(), labels=None, limit=60,
                 continue
 
             hero_id = player.get("hero_id")
-            team = _pick(player, TEAM_KEYS)
-            won = None
-            if isinstance(team, int):
-                champ = resolve_winner(winner, side_keys)
-                if champ is not None:
-                    won = (team == champ)
+            team = norm_side(_pick(player, TEAM_KEYS))
+            won = player_won(player)
+            if won is None and team is not None and champ is not None:
+                won = (team == champ)
 
             who = labels.get(account_id, {})
             for e in entries:
@@ -1685,7 +1748,8 @@ DURATION_KEYS = ("duration_s", "match_duration_s", "duration")
 
 def bulk_match_metadata(account_ids=(), days=DEFAULT_DAYS,
                         match_mode=CUSTOMS_ONLY, limit=1000, match_ids=(),
-                        min_match_id=None, refresh=False, with_items=True):
+                        min_match_id=None, refresh=False, with_items=True,
+                        game_mode=DEFAULT_GAME_MODE, min_average_badge=None):
     """
     /v1/matches/metadata -- up to 10,000 matches in ONE request, filtered by
     the players in them. Ten requests a minute, against three an hour for the
@@ -1695,11 +1759,12 @@ def bulk_match_metadata(account_ids=(), days=DEFAULT_DAYS,
     """
     params = {
         "include_info": "true",
-        # the winning team lives behind this flag, and without it every
-        # outcome comes back unknown and win rates render blank
-        "include_more_info": "true",
         "include_player_info": "true",
         "match_mode": match_mode or None,
+        # every analytics endpoint defaults game_mode to "normal" server-side;
+        # this one does not, so without it the metadata paths quietly mix in
+        # Street Brawl while the rest of the report is normal games only
+        "game_mode": game_mode or None,
         "limit": max(1, min(int(limit), 10000)),
         "order_by": "match_id",
         "order_direction": "desc",
@@ -1708,6 +1773,9 @@ def bulk_match_metadata(account_ids=(), days=DEFAULT_DAYS,
         params["include_player_items"] = "true"
     if account_ids:
         params["account_ids"] = ",".join(str(a) for a in account_ids)
+    if min_average_badge:
+        # lets a ladder-wide sample be drawn by skill instead of by account
+        params["min_average_badge"] = int(min_average_badge)
     if match_ids:
         params["match_ids"] = ",".join(str(m) for m in match_ids)
     if min_match_id is not None:
@@ -1728,13 +1796,8 @@ def _match_rows(match, account_ids=None, labels=None, names=None,
     mid = _pick(match, MATCH_ID_KEYS)
     if mid is None:
         mid = _find_scalar(match, *MATCH_ID_KEYS)
-    winner = _match_winner(match)
     start = _pick(match, START_KEYS)
-
-    # the sides present in this match, so the winner value can be mapped
-    side_keys = {_pick(p, TEAM_KEYS) for p in _walk_dicts(match)
-                 if isinstance(p.get("account_id"), int) and p["account_id"] > 0}
-    side_keys = {k for k in side_keys if isinstance(k, int)}
+    champ = winning_side(match)
 
     rows = []
     for player in _walk_dicts(match):
@@ -1748,12 +1811,10 @@ def _match_rows(match, account_ids=None, labels=None, names=None,
             continue
 
         hero_id = player.get("hero_id")
-        team = _pick(player, TEAM_KEYS)
-        won = None
-        if isinstance(team, int):
-            champ = resolve_winner(winner, side_keys)
-            if champ is not None:
-                won = (team == champ)
+        team = norm_side(_pick(player, TEAM_KEYS))
+        won = player_won(player)
+        if won is None and team is not None and champ is not None:
+            won = (team == champ)
         who = labels.get(account_id, {})
 
         for e in entries:
@@ -1816,11 +1877,23 @@ def bulk_build_rows(raw, account_ids=(), labels=None, names=None,
 
 
 def match_builds_bulk(account_ids=(), labels=None, days=DEFAULT_DAYS,
-                      match_mode=CUSTOMS_ONLY, limit=1000, refresh=False):
+                      match_mode=CUSTOMS_ONLY, limit=1000, refresh=False,
+                      game_mode=DEFAULT_GAME_MODE):
     """One request in, purchase rows out."""
     raw = bulk_match_metadata(account_ids, days, match_mode, limit,
-                              refresh=refresh)
+                              refresh=refresh, game_mode=game_mode)
     return bulk_build_rows(raw, account_ids, labels)
+
+
+def hit_limit(raw, limit):
+    """
+    True when a bulk response came back exactly full.
+
+    Results are ordered newest-first, so a full response means older matches
+    were cut off -- worth saying rather than quietly analysing a subset.
+    """
+    n = len(raw) if isinstance(raw, list) else 0
+    return bool(limit) and n >= int(limit)
 
 
 def bulk_matches(raw):
@@ -1840,16 +1913,15 @@ def bulk_matches(raw):
             if isinstance(account_id, int) and account_id > 0:
                 players.append({"account_id": account_id,
                                 "hero_id": p.get("hero_id"),
-                                "team": _pick(p, TEAM_KEYS)})
+                                "team": norm_side(_pick(p, TEAM_KEYS)),
+                                "won": player_won(p)})
         out.append({
             "match_id": mid,
             "start_time": _pick(m, START_KEYS),
             "duration_s": _pick(m, DURATION_KEYS),
             "match_mode": m.get("match_mode"),
             "game_mode": m.get("game_mode"),
-            "winning_team": resolve_winner(
-                _match_winner(m),
-                {p["team"] for p in players if isinstance(p.get("team"), int)}),
+            "winning_team": winning_side(m),
             "average_badge": m.get("average_badge"),
             "players": players,
         })
@@ -1859,7 +1931,8 @@ def bulk_matches(raw):
 # ---- sides: who actually played together, and what to call a mixed side
 
 def bulk_participants(match_ids, account_ids=(), days=None,
-                      match_mode=CUSTOMS_ONLY, refresh=False):
+                      match_mode=CUSTOMS_ONLY, refresh=False,
+                      game_mode=DEFAULT_GAME_MODE):
     """
     {match_id: {account_id: {'hero_id','team'}}} for many matches in ONE
     request, via the bulk metadata endpoint. Falls back to {} if it fails,
@@ -1875,7 +1948,8 @@ def bulk_participants(match_ids, account_ids=(), days=None,
                                       match_mode=match_mode,
                                       limit=1000,
                                       match_ids=ids[chunk:chunk + 1000],
-                                      refresh=refresh, with_items=False)
+                                      refresh=refresh, with_items=False,
+                                      game_mode=game_mode)
         except Exception:
             continue
         matches = raw if isinstance(raw, list) else [raw]
@@ -1889,11 +1963,95 @@ def bulk_participants(match_ids, account_ids=(), days=None,
             for p in _walk_dicts(m):
                 account_id = p.get("account_id")
                 if isinstance(account_id, int) and account_id > 0:
-                    players[account_id] = {"hero_id": p.get("hero_id"),
-                                           "team": _pick(p, TEAM_KEYS)}
+                    players[account_id] = {
+                        "hero_id": p.get("hero_id"),
+                        "team": norm_side(_pick(p, TEAM_KEYS)),
+                        "won": player_won(p)}
             if players:
                 out[mid] = players
     return out
+
+
+# The API reports sides and outcomes as STRINGS -- player `team` is "Team0" /
+# "Team1" and `winning_team` is "Team1", not 0 and 1. Everything below
+# normalises to ints before comparing; comparing the raw values silently
+# fails and every win rate comes out blank.
+SIDE_RE = re.compile(r"^\s*team[_\s-]*(\d+)\s*$", re.I)
+PLAYER_OUTCOME_KEYS = ("player_match_outcome", "match_outcome", "outcome")
+
+
+def norm_side(value):
+    """'Team1' -> 1, 1 -> 1, anything else -> None."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        m = SIDE_RE.match(value)
+        if m:
+            return int(m.group(1))
+        if value.strip().isdigit():
+            return int(value)
+    return None
+
+
+def player_won(player):
+    """
+    A player's own result, which beats reconciling sides against a winner.
+
+    Accepts the numeric convention (1 win, 2 loss) and the string one
+    ("Win" / "Loss"). -> True, False, or None when it cannot be told.
+    """
+    for key in PLAYER_OUTCOME_KEYS:
+        v = player.get(key)
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, int):
+            if v == WIN:
+                return True
+            if v == LOSS:
+                return False
+        elif isinstance(v, str):
+            low = v.strip().lower()
+            if low.startswith("win") or low == "teamwin":
+                return True
+            if low.startswith(("loss", "lose", "defeat")):
+                return False
+    return None
+
+
+def winning_side(match):
+    """
+    Which side (normalised) won, preferring the players' own outcomes.
+
+    -> int side, or None.
+    """
+    for p in _walk_dicts(match):
+        if not isinstance(p.get("account_id"), int) or p["account_id"] <= 0:
+            continue
+        side = norm_side(_pick(p, TEAM_KEYS))
+        won = player_won(p)
+        if side is not None and won is not None:
+            return side if won else _other_side(match, side)
+    return norm_side(_match_winner_raw(match))
+
+
+def _other_side(match, side):
+    """The other side present in a match, when there are exactly two."""
+    sides = {norm_side(_pick(p, TEAM_KEYS)) for p in _walk_dicts(match)
+             if isinstance(p.get("account_id"), int) and p["account_id"] > 0}
+    sides = {s for s in sides if s is not None}
+    others = sides - {side}
+    return others.pop() if len(others) == 1 else None
+
+
+def _match_winner_raw(match):
+    """The raw value of whichever winner key is present."""
+    for d in _walk_dicts(match):
+        for key in WINNER_KEYS:
+            if key in d and norm_side(d[key]) is not None:
+                return d[key]
+    return None
 
 
 def winner_offset(lineups):
@@ -2008,7 +2166,8 @@ def same_side_match_ids(participants, members, min_players=4, labels=None):
 
 def bulk_lineups(account_ids=(), days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY,
                  limit=1000, match_ids=(), labels=None, names=None,
-                 refresh=False):
+                 refresh=False, game_mode=DEFAULT_GAME_MODE,
+                 min_average_badge=None):
     """
     Both lineups of each match, with the winner.
 
@@ -2025,7 +2184,9 @@ def bulk_lineups(account_ids=(), days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY,
 
     raw = bulk_match_metadata(account_ids, days=days, match_mode=match_mode,
                               limit=limit, match_ids=match_ids,
-                              refresh=refresh, with_items=False)
+                              refresh=refresh, with_items=False,
+                              game_mode=game_mode,
+                              min_average_badge=min_average_badge)
     matches = raw if isinstance(raw, list) else ([raw] if isinstance(raw, dict)
                                                  else [])
     out = []
@@ -2041,17 +2202,26 @@ def bulk_lineups(account_ids=(), days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY,
             if not isinstance(account_id, int) or account_id <= 0:
                 continue
             hero_id = p.get("hero_id")
-            sides.setdefault(_pick(p, TEAM_KEYS), []).append({
+            pre = p.get("pregame_hero_id")
+            sides.setdefault(norm_side(_pick(p, TEAM_KEYS)), []).append({
                 "account_id": account_id,
                 "hero_id": hero_id,
                 "hero": names.get(hero_id, f"hero {hero_id}"),
+                # locked before the pre-game swap window; 0 means unknown
+                "pregame_hero_id": pre if isinstance(pre, int) and pre else None,
+                "pregame_hero": (names.get(pre, f"hero {pre}")
+                                 if isinstance(pre, int) and pre else ""),
+                "swapped": (isinstance(pre, int) and pre > 0
+                            and pre != hero_id),
                 "team": labels.get(account_id, {}).get("team", ""),
                 "is_roster": account_id in roster,
             })
         if len(sides) >= 2:
             out.append({"match_id": mid,
                         "start_time": _pick(m, START_KEYS),
-                        "winner": _match_winner(m),
+                        "match_mode": m.get("match_mode"),
+                        "game_mode": m.get("game_mode"),
+                        "winner": winning_side(m),
                         "sides": sides})
     return out
 
@@ -2112,21 +2282,29 @@ def hero_combos(lineups, size=3, team=None, roster_only=True, min_games=2,
     return rows[:top]
 
 
-def hero_matchups(lineups, min_games=2, team=None, roster_only=False, top=60):
+def hero_matchups(lineups, min_games=2, team=None, roster_only=False,
+                  top=60, alpha=0.05):
     """
-    What tends to show up on the OTHER side when a hero is picked.
+    What shows up on the OTHER side when a hero is picked -- measured
+    against what pick rates alone would produce.
 
-    The Billy/Abrams question: of the games where one side took hero X, in
-    how many did the opposing side take hero Y.
+    Deadlock has no draft: picks are blind and simultaneous outside the
+    pre-game swap window, so raw co-occurrence is mostly arithmetic. If
+    Abrams appears on 30% of sides, he lands opposite any hero about 30% of
+    the time whether or not anyone is answering anything. The number that
+    carries information is the EXCESS over that baseline.
 
-    -> [{'hero','answer','games','picks','answer_rate','wins','win_rate'}]
-       picks       games where `hero` was picked at all
-       answer_rate share of those where `answer` was opposite
-       win_rate    how `hero`'s side did in that specific matchup
+    -> [{'hero','answer','games','picks','answer_rate','expected_rate',
+         'excess','p','q','significant','wins','win_rate'}]
+       answer_rate    share of `hero`'s sides that faced `answer`
+       expected_rate  `answer`'s own rate of appearing on a side
+       excess         answer_rate - expected_rate; ~0 means chance
     """
     shift = winner_offset(lineups)
-    picks = Counter()
+    picks = Counter()          # sides on which each hero appeared
+    seen_sides = 0
     pair = {}
+
     for m in lineups:
         sides = list(m["sides"].items())
         if len(sides) < 2:
@@ -2142,6 +2320,7 @@ def hero_matchups(lineups, min_games=2, team=None, roster_only=False, top=60):
                      else resolve_winner(m["winner"] + shift, m["sides"]))
             won = None if champ is None else (side == champ)
 
+            seen_sides += 1
             for hero in {p["hero"] for p in mine}:
                 picks[hero] += 1
                 for foe in {p["hero"] for p in enemy}:
@@ -2154,17 +2333,50 @@ def hero_matchups(lineups, min_games=2, team=None, roster_only=False, top=60):
                         row["wins"] += 1 if won else 0
 
     rows = []
-    for (hero, _), row in pair.items():
+    for (hero, answer), row in pair.items():
         if row["games"] < min_games:
             continue
         seen = picks.get(hero, 0)
+        base = (picks.get(answer, 0) / seen_sides) if seen_sides else None
+        observed = row["games"] / seen if seen else None
         row["picks"] = seen
-        row["answer_rate"] = round(row["games"] / seen * 100, 1) if seen else None
+        row["answer_rate"] = round(observed * 100, 1) if observed is not None else None
+        row["expected_rate"] = round(base * 100, 1) if base is not None else None
+        row["excess"] = (round((observed - base) * 100, 1)
+                         if None not in (observed, base) else None)
+        # binomial test of `games` hits in `seen` tries against the baseline
+        if base and 0 < base < 1 and seen:
+            se = math.sqrt(base * (1 - base) / seen)
+            z = (observed - base) / se if se else 0.0
+            row["z"] = round(z, 2)
+            row["p"] = 2.0 * 0.5 * math.erfc(abs(z) / math.sqrt(2))
+        else:
+            row["z"], row["p"] = None, None
         row["win_rate"] = (round(row["wins"] / row["decided"] * 100, 1)
                            if row["decided"] else None)
         rows.append(row)
-    rows.sort(key=lambda r: (-(r["answer_rate"] or 0), -r["games"]))
+
+    _bh(rows, alpha)
+    rows.sort(key=lambda r: (-(r["excess"] or 0), -r["games"]))
     return rows[:top]
+
+
+def _bh(rows, alpha=0.05):
+    """Benjamini-Hochberg, so a table of thousands of pairings stays honest."""
+    scored = sorted((r for r in rows if r.get("p") is not None),
+                    key=lambda r: r["p"])
+    n = len(scored)
+    cutoff = 0
+    for i, r in enumerate(scored, 1):
+        if r["p"] <= alpha * i / n:
+            cutoff = i
+    for i, r in enumerate(scored, 1):
+        r["q"] = min(1.0, r["p"] * n / i)
+        r["significant"] = i <= cutoff
+    for r in rows:
+        r.setdefault("q", None)
+        r.setdefault("significant", False)
+    return rows
 
 
 def lineup_teams(lineups, roster_only=True):
@@ -2178,3 +2390,509 @@ def lineup_teams(lineups, roster_only=True):
             if label:
                 seen[label] += 1
     return [t for t, _ in seen.most_common()]
+
+# ---- ranks: tier + subrank, the way the game shows them
+
+RANKS_FILE = "ranks.json"
+SUBRANKS = (1, 2, 3, 4, 5, 6)
+
+
+def ranks(refresh=False):
+    """The rank assets: name and tier per rank."""
+    return get_cached("/v1/assets/ranks", RANKS_FILE, refresh=refresh)
+
+
+def rank_tiers(refresh=False):
+    """
+    {tier: name}, from the assets when reachable and from the hard-coded
+    ladder otherwise, so a picker still works offline.
+    """
+    out = {}
+    try:
+        for r in _walk_dicts(ranks(refresh)):
+            tier, name = r.get("tier"), r.get("name")
+            if isinstance(tier, int) and name:
+                out.setdefault(tier, name)
+    except Exception:
+        pass
+    if not out:
+        out = {i: name for i, name in enumerate(RANKS, start=1)}
+    return dict(sorted(out.items()))
+
+
+def badge_for(tier, subrank=1):
+    """
+    The API's `average_badge` encoding: tier in the leading digits, subrank
+    in the last. Phantom (tier 9) subrank 3 -> 93.
+    """
+    if tier is None:
+        return None
+    return int(tier) * 10 + int(subrank or 0)
+
+
+def badge_label(badge, tiers=None):
+    """93 -> 'Phantom 3'. The inverse of badge_for()."""
+    if badge is None:
+        return ""
+    tiers = tiers or rank_tiers()
+    tier, subrank = divmod(int(badge), 10)
+    name = tiers.get(tier, f"tier {tier}")
+    return f"{name} {subrank}" if subrank else name
+
+
+def rank_choices(refresh=False):
+    """[(label, badge)] every rank and subrank, lowest first -- for a picker."""
+    tiers = rank_tiers(refresh)
+    return [(f"{name} {sub}", badge_for(tier, sub))
+            for tier, name in tiers.items() for sub in SUBRANKS]
+
+
+def hero_swaps(lineups, min_games=3, top=40):
+    """
+    The pre-game swap window -- the only reactive mechanic in the game.
+
+    `pregame_hero_id` is what a player locked before the window; when it
+    differs from `hero_id` they changed their mind after seeing the lobby.
+    Unlike raw co-occurrence, this IS a response, so it is worth reading as
+    one.
+
+    -> ({'from','to','count','share'} rows, summary dict)
+    """
+    moves = Counter()
+    swapped_from = Counter()
+    total_players = swaps_seen = known = 0
+
+    for m in lineups:
+        for group in m["sides"].values():
+            for p in group:
+                total_players += 1
+                if p.get("pregame_hero_id"):
+                    known += 1
+                if p.get("swapped"):
+                    swaps_seen += 1
+                    moves[(p["pregame_hero"], p["hero"])] += 1
+                    swapped_from[p["pregame_hero"]] += 1
+
+    rows = []
+    for (src, dst), count in moves.items():
+        if count < min_games:
+            continue
+        away = swapped_from.get(src, 0)
+        rows.append({"from": src, "to": dst, "count": count,
+                     "share": round(count / away * 100, 1) if away else None})
+    rows.sort(key=lambda r: -r["count"])
+
+    summary = {
+        "players_seen": total_players,
+        "with_pregame_data": known,
+        "swaps": swaps_seen,
+        "swap_rate": round(swaps_seen / known * 100, 1) if known else None,
+        "into": [{"hero": h, "count": n}
+                 for h, n in Counter(r for _, r in moves.elements()).most_common(10)],
+        "out_of": [{"hero": h, "count": n}
+                   for h, n in swapped_from.most_common(10)],
+    }
+    return rows[:top], summary
+
+
+# ---- soft bans: taking a hero, then dropping it before the game starts
+
+# Swapping is a ranked-only mechanic. In unranked a player is stuck with the
+# hero they locked, so any pregame/final difference there is a data artifact
+# rather than a decision, and mixing the two would pollute the rate.
+SWAP_MODES = ("ranked",)
+
+
+def swap_eligible(lineups, modes=SWAP_MODES):
+    """
+    (eligible lineups, skipped count). A lineup with no match_mode is kept --
+    better to include an unknown than to silently drop most of the data.
+    """
+    keep, skipped = [], 0
+    for m in lineups:
+        mode = (m.get("match_mode") or "").lower()
+        if mode and modes and mode not in modes:
+            skipped += 1
+            continue
+        keep.append(m)
+    return keep, skipped
+
+
+def hero_strength(lineups, modes=None):
+    """
+    How each hero actually does, from the same lineups.
+
+    Needed because dropping a hero has two very different motives. Denying a
+    strong hero costs you something and hurts the enemy. Dropping a weak one
+    is just refusing to play a bad hero -- nobody needs to deny what nobody
+    wants. Without this, the two are indistinguishable.
+
+    -> {hero: {'games','wins','win_rate','pick_rate'}} plus a '_mean' entry
+    """
+    if modes:
+        lineups, _ = swap_eligible(lineups, modes)
+    shift = winner_offset(lineups)
+    played = Counter()
+    won = Counter()
+    decided = Counter()
+    sides_seen = 0
+
+    for m in lineups:
+        champ = (None if shift is None or m["winner"] is None
+                 else resolve_winner(m["winner"] + shift, m["sides"]))
+        for side, group in m["sides"].items():
+            sides_seen += 1
+            result = None if champ is None else (side == champ)
+            for p in group:
+                played[p["hero"]] += 1
+                if result is not None:
+                    decided[p["hero"]] += 1
+                    won[p["hero"]] += 1 if result else 0
+
+    out = {}
+    for hero, n in played.items():
+        d = decided.get(hero, 0)
+        out[hero] = {
+            "games": n,
+            "wins": won.get(hero, 0),
+            "win_rate": round(won.get(hero, 0) / d * 100, 1) if d else None,
+            "pick_rate": round(n / sides_seen * 100, 2) if sides_seen else None,
+        }
+    rates = [v["win_rate"] for v in out.values() if v["win_rate"] is not None]
+    out["_mean"] = {"win_rate": round(sum(rates) / len(rates), 1) if rates else None,
+                    "sides": sides_seen}
+    return out
+
+
+def soft_bans(lineups, min_locks=10, alpha=0.05, modes=SWAP_MODES,
+              triggers=None, strength=None, weak_margin=2.0):
+    """
+    Heroes that get ASSIGNED and then dropped during the face-off phase.
+
+    The starting hero is not a pick. The matchmaker assigns it from the
+    priority list a player submitted on the roster screen -- purple for
+    mains, gold for backups, a checkmark for "fine, if you must", with at
+    least three required. So the dominant meaning of a drop is simply that
+    somebody was handed a hero further down their own list.
+
+    That makes drop rate a revealed-preference measure -- how unwanted a
+    hero is once you are given it -- and NOT a ban list. Deliberately
+    denying a hero is possible but awkward: you cannot choose to lock the
+    hero you want to deny, you have to be assigned it, and it costs your
+    only swap. So a soft ban is a rare subset, and this only says so when
+    the hero is strong enough to be worth the trouble.
+
+    The rules matter here. Swapping off frees the hero on the server
+    immediately, so a drop is not a hard ban -- but the enemy only ever sees
+    the composition you LOADED IN with, never your swap. So a denial works
+    through fog of war: the enemy does not know the hero came free.
+    Teammates do see swaps, so they can take it.
+
+    That gives a falsifiable prediction, which the last three columns test:
+    a working denial should leave the hero played by nobody, occasionally
+    picked up by a teammate, and almost never by an enemy.
+
+    Because each player may swap only once, a drop also costs the swapper
+    their only change.
+
+    Destination scatter is weak evidence on its own here: you may only swap
+    to a hero that is unlocked AND not already taken, so where anyone lands
+    depends mostly on what is left.
+
+    -> (rows, summary)
+    """
+    lineups, skipped = swap_eligible(lineups, modes)
+    if strength is None:
+        strength = hero_strength(lineups)
+    average = (strength.get("_mean") or {}).get("win_rate")
+
+    locked = Counter()
+    away = Counter()
+    destinations = {}
+    stuck = Counter()          # dropped, then played by nobody
+    by_mate = Counter()        # a teammate took it (they can see the swap)
+    by_enemy = Counter()       # an enemy took it (they cannot)
+    known = 0
+    impossible_mirrors = 0
+
+    for m in lineups:
+        sides = m["sides"]
+        final = {side: {p["hero"] for p in group} for side, group in sides.items()}
+        everyone = set().union(*final.values()) if final else set()
+
+        # heroes are unique match-wide, so the same hero on both sides means
+        # the data is off -- worth counting rather than silently trusting
+        seen = [h for group in final.values() for h in group]
+        if len(seen) != len(set(seen)):
+            impossible_mirrors += 1
+
+        for side, group in sides.items():
+            for p in group:
+                pre = p.get("pregame_hero")
+                if not pre:
+                    continue
+                known += 1
+                locked[pre] += 1
+                if not p.get("swapped"):
+                    continue
+                away[pre] += 1
+                destinations.setdefault(pre, Counter())[p["hero"]] += 1
+
+                if pre not in everyone:
+                    stuck[pre] += 1
+                elif pre in final.get(side, set()):
+                    by_mate[pre] += 1
+                else:
+                    by_enemy[pre] += 1
+
+    overall = (sum(away.values()) / known) if known else 0.0
+
+    rows = []
+    for hero, n in locked.items():
+        if n < min_locks:
+            continue
+        gone = away.get(hero, 0)
+        rate = gone / n
+        dests = destinations.get(hero, Counter())
+        top_hero, top_n = (dests.most_common(1)[0] if dests else ("", 0))
+
+        z = p = None
+        if overall and 0 < overall < 1 and n:
+            se = math.sqrt(overall * (1 - overall) / n)
+            z = (rate - overall) / se if se else 0.0
+            p = 2.0 * 0.5 * math.erfc(abs(z) / math.sqrt(2))
+
+        rows.append({
+            "hero": hero,
+            "locked": n,
+            "kept": n - gone,
+            "swapped_away": gone,
+            "away_rate": round(rate * 100, 1),
+            "excess": round((rate - overall) * 100, 1),
+            "top_destination": top_hero,
+            "top_share": round(top_n / gone * 100, 1) if gone else None,
+            "destinations": len(dests),
+            "hero_win_rate": (strength.get(hero) or {}).get("win_rate"),
+            "hero_games": (strength.get(hero) or {}).get("games", 0),
+            "denial_stuck": stuck.get(hero, 0),
+            "stuck_rate": round(stuck.get(hero, 0) / gone * 100, 1) if gone else None,
+            "taken_by_teammate": by_mate.get(hero, 0),
+            "taken_by_enemy": by_enemy.get(hero, 0),
+            "z": round(z, 2) if z is not None else None,
+            "p": p,
+        })
+
+    _bh(rows, alpha)
+
+    # A drop explained by a specific enemy hero is a reaction, not a ban --
+    # and the stuck-rate cannot tell them apart, since a dropped hero goes
+    # unplayed either way. So counter-swap findings take precedence.
+    # A significant trigger is not enough. Heroes are unique match-wide, so
+    # taking one changes what else is available and comps end up correlated
+    # for reasons that have nothing to do with countering. The test that
+    # matters: WITHOUT the trigger present, does the drop rate fall back to
+    # normal? If it stays elevated, the hero is being dropped regardless and
+    # the trigger is a passenger.
+    by_hero = {}
+    for t in (triggers or []):
+        if not (t.get("significant") and t.get("excess", 0) > 0):
+            continue
+        rest = (t.get("rate_unseen") or 0) / 100.0
+        n_rest = max(1, t.get("locks_when_seen", 0))
+        se = math.sqrt(overall * (1 - overall) / n_rest) if 0 < overall < 1 else 0
+        still_high = bool(se) and (rest - overall) / se > 2
+        if still_high:
+            continue                      # dropped anyway; not a reaction
+        best = by_hero.get(t["hero"])
+        if not best or t["excess"] > best["excess"]:
+            by_hero[t["hero"]] = t
+
+    for r in rows:
+        trigger = by_hero.get(r["hero"])
+        r["trigger"] = trigger["trigger"] if trigger else ""
+        r["trigger_excess"] = trigger["excess"] if trigger else None
+
+        wr = r["hero_win_rate"]
+        weak = (average is not None and wr is not None
+                and wr < average - weak_margin)
+        strong = (average is not None and wr is not None
+                  and wr > average + weak_margin)
+
+        # drop rate against strength, since the two together say more than
+        # either alone
+        if r["away_rate"] >= (overall * 100) and weak:
+            r["quadrant"] = "unwanted and weak"
+        elif r["away_rate"] >= (overall * 100) and strong:
+            r["quadrant"] = "strong but refused"
+        elif weak:
+            r["quadrant"] = "kept but weak"
+        elif strong:
+            r["quadrant"] = "kept and strong"
+        else:
+            r["quadrant"] = "middling"
+
+        if not r["significant"] or r["excess"] <= 0:
+            r["reads_as"] = ""
+        elif wr is None:
+            # cannot tell avoidance from denial without knowing if the hero
+            # is any good, so say that rather than guess
+            r["reads_as"] = "refused (strength unknown)"
+        elif trigger:
+            r["reads_as"] = f"counter-swap vs {trigger['trigger']}"
+        elif weak:
+            # nobody needs to deny a hero nobody wants: this is a player
+            # refusing a bad hero, not a ban
+            r["reads_as"] = "avoided (weak hero)"
+        elif r["top_share"] is not None and r["top_share"] >= 50:
+            r["reads_as"] = f"swap to {r['top_destination']}"
+        elif (strong and r["stuck_rate"] is not None
+              and r["stuck_rate"] >= 80 and r["destinations"] >= 3):
+            # strong hero, given up anyway, and it stayed out of the game --
+            # the only shape a deliberate denial can take
+            r["reads_as"] = "possible soft ban"
+        else:
+            r["reads_as"] = "refused assignment"
+
+    rows.sort(key=lambda r: -r["away_rate"])
+    total_gone = sum(away.values())
+    summary = {
+        "players_with_pregame": known,
+        "overall_away_rate": round(overall * 100, 1) if known else None,
+        "matches_used": len(lineups),
+        "matches_skipped_not_swappable": skipped,
+        "drops": total_gone,
+        "denials_held": sum(stuck.values()),
+        "picked_up_by_teammate": sum(by_mate.values()),
+        "picked_up_by_enemy": sum(by_enemy.values()),
+        "duplicate_hero_matches": impossible_mirrors,
+        "average_win_rate": average,
+        "avoided_weak": [r["hero"] for r in rows
+                         if r["reads_as"] == "avoided (weak hero)"],
+        "soft_bans": [r["hero"] for r in rows
+                      if r["reads_as"] == "possible soft ban"],
+        "most_refused": [r["hero"] for r in rows[:5] if r["excess"] > 0],
+    }
+    return rows, summary
+
+
+def counter_swaps(lineups, min_locks=20, alpha=0.05, modes=SWAP_MODES):
+    """
+    Drops that depend on what the ENEMY loaded in with.
+
+    A denial is unconditional -- the hero goes regardless of the opposition.
+    A counter-swap spikes only against particular heroes.
+
+    The conditioning has to be on the enemy's PRE-GAME composition, since
+    that is all a player can see: enemy swaps are hidden, and only their
+    loading-in lineup is visible. Conditioning on their final heroes would
+    be conditioning on information nobody had.
+
+    -> [{'hero','trigger','drops_when_seen','locks_when_seen','rate_seen',
+         'rate_unseen','excess','p','q','significant'}]
+    """
+    lineups, _ = swap_eligible(lineups, modes)
+
+    seen_locks, seen_drops = Counter(), Counter()
+    base_locks, base_drops = Counter(), Counter()
+
+    for m in lineups:
+        sides = m["sides"]
+        # what each side could SEE of the other: heroes as loaded in
+        visible = {}
+        for side, group in sides.items():
+            visible[side] = {p.get("pregame_hero") or p["hero"] for p in group}
+
+        for side, group in sides.items():
+            enemy_view = set()
+            for other, heroes in visible.items():
+                if other != side:
+                    enemy_view |= heroes
+            for p in group:
+                pre = p.get("pregame_hero")
+                if not pre:
+                    continue
+                dropped = bool(p.get("swapped"))
+                base_locks[pre] += 1
+                if dropped:
+                    base_drops[pre] += 1
+                for foe in enemy_view:
+                    seen_locks[(pre, foe)] += 1
+                    if dropped:
+                        seen_drops[(pre, foe)] += 1
+
+    rows = []
+    for (hero, foe), n in seen_locks.items():
+        if n < min_locks:
+            continue
+        total_n = base_locks.get(hero, 0)
+        total_d = base_drops.get(hero, 0)
+        d = seen_drops.get((hero, foe), 0)
+        other_n, other_d = total_n - n, total_d - d
+        if other_n < min_locks:
+            continue
+        rate_seen = d / n
+        rate_unseen = other_d / other_n
+        pooled = (d + other_d) / (n + other_n)
+        se = math.sqrt(pooled * (1 - pooled) * (1 / n + 1 / other_n)) \
+            if 0 < pooled < 1 else 0
+        z = (rate_seen - rate_unseen) / se if se else 0.0
+        rows.append({
+            "hero": hero, "trigger": foe,
+            "locks_when_seen": n, "drops_when_seen": d,
+            "rate_seen": round(rate_seen * 100, 1),
+            "rate_unseen": round(rate_unseen * 100, 1),
+            "excess": round((rate_seen - rate_unseen) * 100, 1),
+            "z": round(z, 2),
+            "p": 2.0 * 0.5 * math.erfc(abs(z) / math.sqrt(2)),
+        })
+
+    _bh(rows, alpha)
+    rows.sort(key=lambda r: -r["excess"])
+    return rows
+
+
+def strength_from_baselines(baselines, names=None):
+    """
+    Turn id-keyed hero stats from /v1/analytics/hero-stats into the
+    name-keyed shape the drop analysis wants.
+
+    Worth doing because the classification hinges on whether a hero is above
+    or below average, and a win rate derived from a couple of thousand
+    sampled matches is noisy once split across every hero. The analytics
+    endpoint aggregates far more games at the same rank.
+    """
+    names = names or {}
+    out = {}
+    for hero_id, entry in (baselines or {}).items():
+        name = names.get(hero_id)
+        if not name:
+            continue
+        out[name] = {"games": entry.get("matches", 0),
+                     "wins": entry.get("wins", 0),
+                     "win_rate": entry.get("win_rate"),
+                     "pick_rate": None}
+    rates = [v["win_rate"] for v in out.values() if v["win_rate"] is not None]
+    out["_mean"] = {"win_rate": round(sum(rates) / len(rates), 1) if rates
+                    else None, "sides": None}
+    return out
+
+
+def drop_report(lineups, min_locks=20, alpha=0.05, modes=SWAP_MODES,
+                strength=None):
+    """
+    Both halves reconciled: which heroes get dropped, and whether each drop
+    is unconditional (a denial) or triggered by what the enemy loaded in
+    with (a reaction).
+
+    `strength` supplies hero win rates; pass strength_from_baselines() to use
+    the same rank's full statistics rather than the sample's own. Left out,
+    it is derived from the lineups.
+    -> (rows, summary, triggers)
+    """
+    triggers = counter_swaps(lineups, min_locks=min_locks, alpha=alpha,
+                             modes=modes)
+    rows, summary = soft_bans(lineups, min_locks=min_locks, alpha=alpha,
+                              modes=modes, triggers=triggers,
+                              strength=strength)
+    summary["counter_swaps"] = sum(1 for t in triggers if t["significant"])
+    return rows, summary, triggers

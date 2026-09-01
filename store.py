@@ -23,9 +23,9 @@ import sqlite3
 import sys
 import time
 
-from deadlock import (CUSTOMS_ONLY, DEFAULT_DAYS, all_ability_ids,
-                      bulk_build_rows, bulk_match_metadata, bulk_matches,
-                      hero_names, item_names, mmss)
+from deadlock import (CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE,
+                      all_ability_ids, bulk_build_rows, bulk_match_metadata,
+                      bulk_matches, hero_names, hit_limit, item_names, mmss)
 
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "deadlock.sqlite")
@@ -108,7 +108,8 @@ def sync_assets(conn, refresh=False):
 
 
 def sync(account_ids, days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY, limit=1000,
-         conn=None, incremental=True, refresh=False):
+         conn=None, incremental=True, refresh=False,
+         game_mode=DEFAULT_GAME_MODE):
     """
     Pull matches for these players and write them in.
 
@@ -126,7 +127,9 @@ def sync(account_ids, days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY, limit=1000,
 
         raw = bulk_match_metadata(account_ids, days=days,
                                   match_mode=match_mode, limit=limit,
-                                  min_match_id=min_match_id, refresh=refresh)
+                                  min_match_id=min_match_id, refresh=refresh,
+                                  game_mode=game_mode)
+        truncated = hit_limit(raw, limit)
 
         matches = bulk_matches(raw)
         before = conn.execute("SELECT COUNT(*) c FROM matches").fetchone()["c"]
@@ -142,9 +145,12 @@ def sync(account_ids, days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY, limit=1000,
                  m["match_mode"], m["game_mode"], m["winning_team"],
                  m["average_badge"]))
             for p in m["players"]:
-                won = None
-                if m["winning_team"] is not None and p["team"] is not None:
-                    won = 1 if p["team"] == m["winning_team"] else 0
+                # the player's own outcome first; sides only as a fallback
+                won = p.get("won")
+                if won is None and (m["winning_team"] is not None
+                                    and p["team"] is not None):
+                    won = p["team"] == m["winning_team"]
+                won = None if won is None else int(bool(won))
                 conn.execute(
                     "INSERT INTO match_players (match_id, account_id, hero_id, "
                     "team, won) VALUES (?,?,?,?,?) "
@@ -176,7 +182,8 @@ def sync(account_ids, days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY, limit=1000,
         conn.commit()
 
         after = conn.execute("SELECT COUNT(*) c FROM matches").fetchone()["c"]
-        return {"matches": len(matches), "new_matches": after - before,
+        return {"matches": len(matches), "truncated": truncated,
+                "new_matches": after - before,
                 "purchases": len(rows),
                 "players": sum(len(m["players"]) for m in matches),
                 "watermark": get_meta(conn, "watermark")}
@@ -334,6 +341,9 @@ def main(argv):
         result = sync(ids, conn=conn)
         for k, v in result.items():
             print(f"  {k:12} {v}")
+        if result.get("truncated"):
+            print("  NOTE: the response came back full, newest first — run "
+                  "sync again to pull the next batch")
         print("\n  now:")
         for k, v in status(conn).items():
             print(f"  {k:12} {v}")

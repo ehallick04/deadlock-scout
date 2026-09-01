@@ -19,3 +19,4 @@ pages/
 # the local store is rebuildable from the API — sync it, do not commit it
 deadlock.sqlite
 deadlock.sqlite-journal
+ranks.json
