@@ -43,14 +43,12 @@ from api import cache_info, clear_cache, export_cache, import_cache
 
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
-    WITH_CUSTOMS, build_report, build_team_report, composition_counts,
-    ability_order, ability_rows, build_summary, buy_order,
-    buy_order_by_player, custom_match_ids, flatten,
-    match_build_order, match_builds, match_builds_bulk,
-    metadata_report,
-    top_heroes_for, typical_builds,
-    flow_edges, flow_rows, get_rank, hero_names, hero_totals, item_flow,
-    parse_ids, read_id_file,
+    WITH_CUSTOMS, ability_order, ability_rows, build_report, build_summary,
+    build_team_report, buy_order, buy_order_by_player, composition_counts,
+    custom_match_ids, flatten, flow_edges, flow_rows, get_rank, hero_names,
+    hero_totals, item_flow, match_build_order, match_builds,
+    match_builds_bulk, metadata_report, mirror_matches, parse_ids,
+    read_id_file, top_heroes_for, typical_builds,
 )
 from teams import LEAGUE, PINNED, TEAMS, choices, roster, search
 
@@ -144,17 +142,40 @@ def print_compositions(comps, limit=None):
                 print(f"      {mark} {p['name'][:20]:<20} {p['hero']}")
 
 
-def print_composition_counts(comps, roster_ids):
-    rows = composition_counts(comps, roster_ids)
-    if not rows:
+def print_mirrors(comps):
+    """Pro-vs-pro games, called out so the numbers below are not misread."""
+    mirrors = mirror_matches(comps)
+    if not mirrors:
         return
-    print(f"\n  HEROES THEY BUILD AROUND")
-    print(f"  {'hero':<16}{'games':>7}{'wins':>6}{'win rate':>11}")
-    print(f"  {'-' * 40}")
-    for r in rows:
-        print(f"  {r['hero']:<16}{r['games']:>7}{r['wins']:>6}"
-              f"{r['win_rate']:>10.1f}%")
+    print(f"\n  {len(mirrors)} of {len(comps)} are pro vs pro "
+          "— both lineups counted:")
+    for r in mirrors:
+        won = f"  ({r['winner_team']} won)" if r["winner_team"] else ""
+        print(f"    {r['match_id']}  {r['matchup']}{won}")
 
+
+def print_composition_counts(comps, roster_ids):
+    """
+    Hero picks on roster sides. When pros scrim each other both lineups are
+    ours, so both are counted -- and split per team, since pooling them
+    hides who actually picked what.
+    """
+    print_mirrors(comps)
+    split = any(m.get("mirror") for m in comps)
+    counts = composition_counts(comps, roster_ids, by_team=split)
+    if not counts:
+        return
+    print(f"\n{'=' * 70}")
+    print("  HERO PICKS" + ("  (per team)" if split else ""))
+    print(f"{'=' * 70}")
+    team = object()
+    for row in counts:
+        if split and row["team"] != team:
+            team = row["team"]
+            print(f"\n  {team or '(unknown team)'}")
+            print(f"  {'-' * 46}")
+        print(f"    {row['hero']:<18}{row['games']:>5}"
+              f"{row['win_rate']:>9.1f}%")
 
 def run_team(ids, days, top, min_players, labels, csv_path=None,
              include_subs=False, show_matches=0):
@@ -467,8 +488,14 @@ def print_one_match(rows, match_id, kind=None):
     if not people:
         print(f"  nothing recorded for match {match_id}")
         return
+    teams_here = sorted({r.get("team") or "" for r in rows
+                         if r["match_id"] == match_id})
+    named = [t for t in teams_here if t]
     print(f"\n{'=' * 70}")
-    print(f"  MATCH {match_id}")
+    print(f"  MATCH {match_id}"
+          + (f"  —  {' vs '.join(named)}" if len(named) > 1 else ""))
+    if len(named) > 1:
+        print("  (pro vs pro — both lineups are yours)")
     print(f"{'=' * 70}")
     for account_id, player in people:
         seq = match_build_order(rows, match_id, account_id, kind=kind)

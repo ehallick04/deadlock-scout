@@ -18,15 +18,14 @@ import streamlit as st
 
 from api import cache_info, clear_cache, export_cache, import_cache
 from deadlock import (
-    CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
-    WITH_CUSTOMS, build_report, build_team_report, composition_counts,
-    ABILITY_STYLES, ability_order, ability_rows, ability_slots,
-    build_summary, buy_order, custom_match_ids, match_build_order,
-    match_builds, match_builds_bulk, metadata_report,
-    top_heroes_for, typical_builds,
-    buy_order_by_player, flatten,
-    flow_edges, flow_rows, hero_names, hero_totals, item_flow, match_compositions,
-    parse_ids, phase_label,
+    ABILITY_STYLES, CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE,
+    DEFAULT_MATCH_MODE, WITH_CUSTOMS, ability_order, ability_rows,
+    ability_slots, build_report, build_summary, build_team_report, buy_order,
+    buy_order_by_player, composition_counts, custom_match_ids, flatten,
+    flow_edges, flow_rows, hero_names, hero_totals, item_flow,
+    match_build_order, match_builds, match_builds_bulk, match_compositions,
+    metadata_report, mirror_matches, parse_ids, phase_label, top_heroes_for,
+    typical_builds,
 )
 from roster_import import BOOKMARKLET, HARVESTER, find_teams, parse_any
 import store
@@ -676,12 +675,32 @@ with tab_match:
 
         comps = st.session_state.get("comps") or []
         if comps:
-            counts = pd.DataFrame(composition_counts(comps, ids))
+            mirrors = mirror_matches(comps)
+            if mirrors:
+                st.info(f"**{len(mirrors)} of {len(comps)} are pro vs pro** — "
+                        "both lineups are teams you selected, so both sides "
+                        "are counted below. Filter by team to separate them.")
+
+            teams_here = sorted({t for m in comps
+                                 for s in m.get("roster_sides", [])
+                                 for t in [(m.get("side_names") or {}).get(s)]
+                                 if t})
+            cc1, cc2 = st.columns([1, 1])
+            scope = cc1.selectbox("Count picks for", ["All selected"]
+                                  + teams_here, key="cc_team")
+            split = cc2.checkbox("One row per team", value=bool(mirrors),
+                                 key="cc_split")
+            counts = pd.DataFrame(composition_counts(
+                comps, ids, by_team=split,
+                team=None if scope == "All selected" else scope))
             if not counts.empty:
                 st.markdown("**Heroes they build around**")
+                cols = (["team"] if split else []) + ["hero", "games", "wins",
+                                                     "win_rate"]
                 st.dataframe(
-                    counts, hide_index=True, use_container_width=True,
+                    counts[cols], hide_index=True, use_container_width=True,
                     column_config={
+                        "team": "Team",
                         "hero": "Hero",
                         "games": st.column_config.NumberColumn("Games"),
                         "wins": st.column_config.NumberColumn("Wins"),
@@ -694,9 +713,17 @@ with tab_match:
                         if m.get("start_time") else "")
                 mins = f"{m['duration_s'] // 60} min" if m.get("duration_s") else ""
                 ours = m.get("side_names", {}).get(m.get("our_side"), "")
-                result = ("" if m["winner"] is None else
-                          (" — WIN" if m["our_side"] == m["winner"] else " — LOSS"))
-                header = f"{ours or 'match'} {result}  ·  {when} {mins}  ·  {m['match_id']}"
+                if m.get("mirror"):
+                    won_by = (m.get("side_names") or {}).get(m.get("winner"), "")
+                    result = f" — {won_by} won" if won_by else ""
+                    header = (f"{m.get('matchup') or 'pro vs pro'}{result}"
+                              f"  ·  {when} {mins}  ·  {m['match_id']}")
+                else:
+                    result = ("" if m["winner"] is None else
+                              (" — WIN" if m["our_side"] == m["winner"]
+                               else " — LOSS"))
+                    header = (f"{ours or 'match'} {result}  ·  {when} {mins}"
+                              f"  ·  {m['match_id']}")
 
                 with st.expander(header.strip()):
                     order = [m["our_side"]] if m["our_side"] is not None else []
@@ -921,9 +948,21 @@ with tab_items:
             st.markdown("**One game at a time**")
             played = sorted({r["match_id"] for r in brows}, reverse=True)
             pick = st.selectbox("Match", played, key="mb_match")
-            in_match = sorted({(r["account_id"], r["player"]) for r in brows
-                               if r["match_id"] == pick})
-            for account_id, player in in_match:
+            here = [r for r in brows if r["match_id"] == pick]
+            sides_here = sorted({r.get("team") or "" for r in here})
+            if len([t for t in sides_here if t]) > 1:
+                st.caption("**Pro vs pro** — " + " vs ".join(t for t in
+                                                             sides_here if t)
+                           + ". Both lineups are yours; the grouping below "
+                             "keeps them apart.")
+            in_match = sorted({(r.get("team") or "", r["account_id"],
+                                r["player"]) for r in here})
+            shown_team = object()
+            for team_here, account_id, player in in_match:
+                if team_here != shown_team:
+                    shown_team = team_here
+                    if team_here:
+                        st.markdown(f"*{team_here}*")
                 seq = match_build_order(brows, pick, account_id, kind=kind_key)
                 if not seq:
                     continue
@@ -939,6 +978,33 @@ with tab_items:
                             "buy_time": st.column_config.TextColumn(
                                 "At", width="small"),
                             "item": "Bought"})
+
+    # ---------------------------------------------------- transitions
+    elif view == "What follows what":
+        st.caption("From the flow graph's edges: when they bought the item on "
+                   "the left, what did they buy next.")
+        try:
+            edges = flow_edges(load_flow_raw(*key))
+        except Exception as e:
+            edges, _ = [], st.error(f"Could not load transitions: {e}")
+        if not edges:
+            st.info("No transitions at these filters — usually too few games.")
+        else:
+            eframe = pd.DataFrame(edges)
+            st.dataframe(
+                eframe.head(top_items)[["from", "to", "matches", "win_rate"]],
+                hide_index=True, use_container_width=True,
+                column_config={
+                    "from": "Bought", "to": "Then bought",
+                    "matches": st.column_config.NumberColumn("Games"),
+                    "win_rate": st.column_config.ProgressColumn(
+                        "Win rate", format="%.1f%%", min_value=0,
+                        max_value=100),
+                })
+            st.download_button("Download transitions (CSV)",
+                               eframe.to_csv(index=False).encode(),
+                               file_name="build_transitions.csv",
+                               mime="text/csv")
 
     # ------------------------------------------------ per-player breakdown
     st.divider()

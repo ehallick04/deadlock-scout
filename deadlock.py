@@ -730,11 +730,18 @@ def match_compositions(match_ids, roster_ids=(), labels=None, limit=60,
             })
 
         winner = outcomes.get(mid)
-        our_side = None
-        for side, group in sides.items():
-            if any(p["is_roster"] for p in group):
-                our_side = side
-                break
+
+        # Which sides hold roster players. Pros scrim each other, so BOTH
+        # sides can be ours -- that is a mirror, and the old "first side with
+        # anyone on it" rule picked one at random and threw the other away.
+        roster_per_side = {side: sum(1 for p in group if p["is_roster"])
+                           for side, group in sides.items()}
+        roster_sides = sorted(s for s, n in roster_per_side.items() if n)
+        mirror = len(roster_sides) > 1
+        # deterministic: most roster players, ties broken by side number
+        our_side = (max(roster_sides,
+                        key=lambda s: (roster_per_side[s], -s))
+                    if roster_sides else None)
 
         for side, group in sides.items():
             group.sort(key=lambda p: (not p["is_roster"], p["name"].lower()))
@@ -753,6 +760,10 @@ def match_compositions(match_ids, roster_ids=(), labels=None, limit=60,
             "duration_s": _find_scalar(players, "duration_s", "match_duration_s"),
             "winner": winner,
             "our_side": our_side,
+            "roster_sides": roster_sides,
+            "mirror": mirror,
+            "matchup": " vs ".join(side_names.get(s) or "?"
+                                   for s in sorted(sides)) if sides else "",
             "sides": sides,
             "side_names": side_names,
         })
@@ -760,26 +771,61 @@ def match_compositions(match_ids, roster_ids=(), labels=None, limit=60,
     return out
 
 
-def composition_counts(compositions, roster_ids=()):
+def composition_counts(compositions, roster_ids=(), by_team=False,
+                       team=None):
     """
-    How often each hero appears on the roster's side, and how it did.
-    -> [{'hero','games','wins','win_rate'}] sorted by games.
+    How often each hero appears on a roster side, and how it did.
+
+    Every side holding roster players is counted, not just one -- in a
+    pro-vs-pro scrim both lineups are ours, and counting a single side would
+    drop half the picks and skew the win rate toward whichever side was
+    listed first.
+
+    by_team   one row per (team, hero) instead of pooling them
+    team      count only this team's side
+
+    -> [{'hero','team','games','wins','win_rate'}] sorted by games.
     """
-    roster_ids = set(roster_ids)
     tally = {}
     for m in compositions:
-        side = m.get("our_side")
-        if side is None:
-            continue
-        for p in m["sides"].get(side, []):
-            row = tally.setdefault(p["hero"], {"hero": p["hero"], "games": 0,
-                                               "wins": 0})
-            row["games"] += 1
-            if p.get("won"):
-                row["wins"] += 1
+        sides = m.get("roster_sides")
+        if sides is None:
+            side = m.get("our_side")
+            sides = [side] if side is not None else []
+        for side in sides:
+            side_team = (m.get("side_names") or {}).get(side, "")
+            if team and side_team != team:
+                continue
+            for p in m["sides"].get(side, []):
+                key = (side_team, p["hero"]) if by_team else p["hero"]
+                row = tally.setdefault(key, {
+                    "hero": p["hero"],
+                    "team": side_team if by_team else "",
+                    "games": 0, "wins": 0})
+                row["games"] += 1
+                if p.get("won"):
+                    row["wins"] += 1
+
     for row in tally.values():
-        row["win_rate"] = round(row["wins"] / row["games"] * 100, 1) if row["games"] else 0.0
-    return sorted(tally.values(), key=lambda r: -r["games"])
+        row["win_rate"] = (round(row["wins"] / row["games"] * 100, 1)
+                           if row["games"] else 0.0)
+    return sorted(tally.values(), key=lambda r: (-r["games"], r["hero"]))
+
+
+def mirror_matches(compositions):
+    """Just the pro-vs-pro games. -> [{'match_id','matchup','winner_team'}]"""
+    out = []
+    for m in compositions:
+        if not m.get("mirror"):
+            continue
+        winner = m.get("winner")
+        out.append({
+            "match_id": m["match_id"],
+            "matchup": m.get("matchup", ""),
+            "winner_team": ((m.get("side_names") or {}).get(winner, "")
+                            if winner is not None else ""),
+        })
+    return out
 
 
 # --------------------------------------------------------------- items
@@ -1375,6 +1421,7 @@ def match_builds(match_ids, account_ids=(), labels=None, limit=60,
                     "match_id": mid,
                     "account_id": account_id,
                     "player": who.get("ign") or str(account_id),
+                    "team": who.get("team", ""),
                     "hero_id": hero_id,
                     "hero": hero_lookup.get(hero_id, ""),
                     "kind": "ability" if item_id in ability_ids else "item",
@@ -1641,6 +1688,7 @@ def _match_rows(match, account_ids=None, labels=None, names=None,
                 "start_time": start,
                 "account_id": account_id,
                 "player": who.get("ign") or str(account_id),
+                "team": who.get("team", ""),
                 "hero_id": hero_id,
                 "hero": hero_lookup.get(hero_id, ""),
                 "kind": "ability" if item_id in ability_ids else "item",
