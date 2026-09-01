@@ -47,6 +47,7 @@ from deadlock import (
     build_team_report, buy_order, buy_order_by_player, composition_counts,
     custom_match_ids, flatten, flow_edges, flow_rows, get_rank, hero_names,
     hero_totals, item_flow, match_build_order, match_builds,
+    bulk_lineups, hero_combos, hero_matchups, lineup_teams,
     match_builds_bulk, metadata_report, mirror_matches, parse_ids,
     read_id_file, top_heroes_for, typical_builds,
 )
@@ -648,6 +649,86 @@ def store_menu(ids, days, match_mode):
         conn.close()
 
 
+def print_comps(rows, size, limit=20):
+    if not rows:
+        print(f"  no {size}-hero group clears the threshold — lower min games")
+        return
+    print(f"\n{'=' * 70}")
+    print(f"  COMPS — {size} heroes together on a side")
+    print(f"{'=' * 70}")
+    team = object()
+    for r in rows[:limit]:
+        if r["team"] != team:
+            team = r["team"]
+            print(f"\n  {team or '(mixed)'}")
+            print(f"  {'-' * 60}")
+        wr = f"{r['win_rate']:.0f}%" if r["win_rate"] is not None else "-"
+        share = f"{r['share']:.0f}%" if r["share"] is not None else "-"
+        print(f"    {r['heroes']:<38}{r['games']:>4}{share:>8}{wr:>8}")
+
+
+def print_matchups(rows, limit=25, hero=None):
+    rows = [r for r in rows if not hero or r["hero"].lower() == hero.lower()]
+    if not rows:
+        print("  no matchup clears the threshold")
+        return
+    print(f"\n{'=' * 70}")
+    print("  MATCHUPS — what shows up on the other side")
+    print(f"{'=' * 70}")
+    print(f"  {'picked':<14}{'faced':<14}{'games':>7}{'picks':>7}"
+          f"{'answer':>9}{'WR':>7}")
+    print(f"  {'-' * 62}")
+    for r in rows[:limit]:
+        wr = f"{r['win_rate']:.0f}%" if r["win_rate"] is not None else "-"
+        rate = f"{r['answer_rate']:.0f}%" if r["answer_rate"] is not None else "-"
+        print(f"  {r['hero']:<14}{r['answer']:<14}{r['games']:>7}"
+              f"{r['picks']:>7}{rate:>9}{wr:>7}")
+
+
+def comps_menu(ids, labels, days, match_mode):
+    """Which heroes they run together, and what answers a pick."""
+    if not ids:
+        print("  add some players first")
+        return
+    print("  one request for every lineup in the window ...")
+    try:
+        lineups = bulk_lineups(ids, days=days, match_mode=match_mode,
+                               labels=labels)
+    except Exception as e:
+        print(f"  request failed: {e}")
+        return
+    if not lineups:
+        print("  no lineups in this window")
+        return
+
+    found = lineup_teams(lineups)
+    print(f"  {len(lineups)} matches. sides: {', '.join(found[:8])}")
+
+    n = ask("  comp size (blank = 3): ", "3")
+    size = int(n) if n.isdigit() and 2 <= int(n) <= 6 else 3
+    g = ask("  minimum games (blank = 3): ", "3")
+    min_games = int(g) if g.isdigit() else 3
+
+    team = None
+    if found:
+        want = ask(f"  one side only? (name, blank = all): ")
+        if want:
+            hits = [t for t in found if want.lower() in t.lower()]
+            team = hits[0] if len(hits) == 1 else None
+            if team:
+                print(f"  -> {team}")
+            else:
+                print("  no single side matched — showing all")
+
+    print_comps(hero_combos(lineups, size=size, team=team,
+                            min_games=min_games), size)
+
+    if ask("\n  show matchups too? (Y/n): ", "y").lower().startswith("y"):
+        rows = hero_matchups(lineups, min_games=min_games)
+        hero = ask("  one hero only? (name, blank = all): ")
+        print_matchups(rows, hero=hero or None)
+
+
 def pick_players(ids, labels):
     """
     Narrow a roster to specific players.
@@ -868,6 +949,7 @@ def menu():
   M. Builds from real matches (uses cached match data)
   S. Standard build for one player on one hero
   D. Local data store (sync / status)
+  K. Comps and matchups (who plays with / against what)
   1. Add players (ids or statlocker URLs)
   2. Load ids from a file
   3. Set time window        (now: last {days} days)
@@ -901,6 +983,9 @@ def menu():
 
         elif choice.lower() == "d":
             store_menu(ids, days, match_mode)
+
+        elif choice.lower() == "k":
+            comps_menu(ids, {}, days, match_mode)
 
         elif choice.lower() == "b":
             from roster_import import HARVESTER

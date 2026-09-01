@@ -24,7 +24,9 @@ from deadlock import (
     buy_order_by_player, composition_counts, custom_match_ids, flatten,
     flow_edges, flow_rows, hero_names, hero_totals, item_flow,
     match_build_order, match_builds, match_builds_bulk, match_compositions,
-    metadata_report, mirror_matches, parse_ids, phase_label, top_heroes_for,
+    bulk_lineups, hero_combos, hero_matchups, lineup_teams,
+    metadata_report, mirror_matches, parse_ids, phase_label,
+    top_heroes_for,
     typical_builds,
 )
 from roster_import import BOOKMARKLET, HARVESTER, find_teams, parse_any
@@ -476,6 +478,14 @@ def load_typical_builds(ids_tuple, labels_tuple, hero_id, days, match_mode,
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
+def load_lineups(ids_tuple, labels_tuple, days, match_mode, limit):
+    """Both lineups of every match in the window. One request."""
+    labels = {k: dict(v) for k, v in labels_tuple}
+    return bulk_lineups(list(ids_tuple), days=days, match_mode=match_mode,
+                        limit=limit, labels=labels)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_top_heroes(account_id, days, match_mode):
     return top_heroes_for(account_id, days=days, match_mode=match_mode)
 
@@ -570,8 +580,10 @@ def load_hero_names():
         return {}
 
 
-tab_hero, tab_player, tab_team, tab_match, tab_items, tab_data = st.tabs(
-    ["By hero", "By player", "By team", "Matches", "Build order", "Raw data"])
+(tab_hero, tab_player, tab_team, tab_match, tab_comps, tab_items,
+ tab_data) = st.tabs(
+    ["By hero", "By player", "By team", "Matches", "Comps", "Build order",
+     "Raw data"])
 
 # ---- pooled hero win rates
 with tab_hero:
@@ -755,6 +767,98 @@ with tab_match:
                             hide_index=True, use_container_width=True)
 
 # ---- everything, downloadable
+# ---- how they build a side, and what shows up opposite
+with tab_comps:
+    st.caption("Both lineups of every match in the window, in one request. "
+               "Comps are heroes that appear together on a side; matchups are "
+               "what tends to show up across from a pick.")
+
+    gc1, gc2, gc3 = st.columns([1, 1, 1])
+    combo_size = gc1.selectbox("Comp size", [2, 3, 4, 5], index=1)
+    min_games = whole_number(
+        gc2.text_input("Min games", value="3"),
+        3, "Min games", minimum=1, maximum=500)
+    match_limit = whole_number(
+        gc3.text_input("Match limit", value="1000"),
+        1000, "Match limit", minimum=1, maximum=10000)
+
+    labels_tuple = tuple((k, tuple(sorted(v.items())))
+                         for k, v in sorted(labels.items()))
+    try:
+        lineups = load_lineups(tuple(ids), labels_tuple, days, match_mode,
+                               match_limit)
+    except Exception as e:
+        lineups, _ = [], st.error(f"Could not load lineups: {e}")
+
+    if not lineups:
+        st.info("No lineups in this window. Widen the days or loosen the "
+                "match modes in the sidebar.")
+    else:
+        found = lineup_teams(lineups)
+        st.caption(f"{len(lineups)} matches · sides seen: "
+                   + ", ".join(found[:8]) if found else f"{len(lineups)} matches")
+
+        st.subheader("Comps they run")
+        pick_team = st.selectbox("Side", ["Any"] + found, key="comp_team")
+        combos = hero_combos(lineups, size=combo_size,
+                             team=None if pick_team == "Any" else pick_team,
+                             min_games=min_games)
+        if not combos:
+            st.info(f"No {combo_size}-hero group appears {min_games}+ times. "
+                    "Lower **Min games** or shrink the comp size.")
+        else:
+            cframe = pd.DataFrame(combos)
+            st.dataframe(
+                cframe[["team", "heroes", "games", "share", "win_rate"]],
+                hide_index=True, use_container_width=True,
+                column_config={
+                    "team": "Side",
+                    "heroes": "Together",
+                    "games": st.column_config.NumberColumn("Games"),
+                    "share": st.column_config.NumberColumn(
+                        "Of their games", format="%.1f%%"),
+                    "win_rate": st.column_config.ProgressColumn(
+                        "Win rate", format="%.1f%%", min_value=0,
+                        max_value=100),
+                })
+            st.download_button("Download comps (CSV)",
+                               cframe.to_csv(index=False).encode(),
+                               file_name="comps.csv", mime="text/csv")
+
+        st.divider()
+        st.subheader("What shows up opposite")
+        st.caption("Of the games where a side picked the hero on the left, "
+                   "the share where the other side had the hero on the right. "
+                   "A high rate is a pick that reliably draws an answer.")
+        mframe = pd.DataFrame(hero_matchups(lineups, min_games=min_games))
+        if mframe.empty:
+            st.info("Not enough games yet for a matchup to clear "
+                    f"{min_games}.")
+        else:
+            heroes_seen = sorted(mframe["hero"].unique())
+            focus = st.selectbox("Hero", ["All"] + heroes_seen,
+                                 key="matchup_hero")
+            view = mframe if focus == "All" else mframe[mframe["hero"] == focus]
+            st.dataframe(
+                view[["hero", "answer", "games", "picks", "answer_rate",
+                      "win_rate"]],
+                hide_index=True, use_container_width=True,
+                column_config={
+                    "hero": "Picked",
+                    "answer": "Faced",
+                    "games": st.column_config.NumberColumn("Together"),
+                    "picks": st.column_config.NumberColumn("Picks"),
+                    "answer_rate": st.column_config.ProgressColumn(
+                        "Answer rate", format="%.1f%%", min_value=0,
+                        max_value=100),
+                    "win_rate": st.column_config.NumberColumn(
+                        "WR into it", format="%.1f%%"),
+                })
+            st.download_button("Download matchups (CSV)",
+                               mframe.to_csv(index=False).encode(),
+                               file_name="matchups.csv", mime="text/csv")
+
+
 # ---- build order: what gets bought, when, and in what sequence
 with tab_items:
     ic1, ic2, ic3 = st.columns([2, 1, 1])

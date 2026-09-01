@@ -1932,3 +1932,170 @@ def same_side_match_ids(participants, members, min_players=4, labels=None):
         if info["count"] >= min_players:
             keep.add(mid)
     return keep, counts, names
+
+
+# ---- team comps and hero matchups
+
+def bulk_lineups(account_ids=(), days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY,
+                 limit=1000, match_ids=(), labels=None, names=None,
+                 refresh=False):
+    """
+    Both lineups of each match, with the winner.
+
+    -> [{'match_id','start_time','winner','sides': {side: [
+           {'account_id','hero_id','hero','team','is_roster'}]}}]
+    """
+    labels = labels or {}
+    if names is None:
+        try:
+            names = hero_names()
+        except Exception:
+            names = {}
+    roster = {int(a) for a in account_ids} if account_ids else set()
+
+    raw = bulk_match_metadata(account_ids, days=days, match_mode=match_mode,
+                              limit=limit, match_ids=match_ids,
+                              refresh=refresh, with_items=False)
+    matches = raw if isinstance(raw, list) else ([raw] if isinstance(raw, dict)
+                                                 else [])
+    out = []
+    for m in matches:
+        if not isinstance(m, dict):
+            continue
+        mid = _pick(m, MATCH_ID_KEYS) or _find_scalar(m, *MATCH_ID_KEYS)
+        if mid is None:
+            continue
+        sides = {}
+        for p in _walk_dicts(m):
+            account_id = p.get("account_id")
+            if not isinstance(account_id, int) or account_id <= 0:
+                continue
+            hero_id = p.get("hero_id")
+            sides.setdefault(_pick(p, TEAM_KEYS), []).append({
+                "account_id": account_id,
+                "hero_id": hero_id,
+                "hero": names.get(hero_id, f"hero {hero_id}"),
+                "team": labels.get(account_id, {}).get("team", ""),
+                "is_roster": account_id in roster,
+            })
+        if len(sides) >= 2:
+            out.append({"match_id": mid,
+                        "start_time": _pick(m, START_KEYS),
+                        "winner": _match_winner(m),
+                        "sides": sides})
+    return out
+
+
+def _side_team(group):
+    """Name a lineup's side from the rosters on it, ties joined with /."""
+    return side_label(Counter(p["team"] for p in group if p["team"]))
+
+
+def hero_combos(lineups, size=3, team=None, roster_only=True, min_games=2,
+                top=40):
+    """
+    Heroes that show up together on the same side.
+
+    size      2 for pairs, 3 for trios, and so on
+    team      only sides belonging to this team (accepts a mixed "A/B" label)
+    -> [{'heroes','team','games','wins','win_rate','share'}]
+       share is out of that team's games in the set.
+    """
+    from itertools import combinations
+
+    tally, side_games = {}, Counter()
+    for m in lineups:
+        for side, group in m["sides"].items():
+            picked = [p for p in group if p["is_roster"]] if roster_only \
+                else list(group)
+            if len(picked) < size:
+                continue
+            label = _side_team(picked)
+            if team and label != team:
+                continue
+            side_games[label] += 1
+            won = None if m["winner"] is None else (side == m["winner"])
+            for combo in combinations(sorted({p["hero"] for p in picked}),
+                                      size):
+                key = (label, combo)
+                row = tally.setdefault(key, {"heroes": " + ".join(combo),
+                                             "team": label, "games": 0,
+                                             "wins": 0})
+                row["games"] += 1
+                if won:
+                    row["wins"] += 1
+
+    rows = []
+    for (label, _), row in tally.items():
+        if row["games"] < min_games:
+            continue
+        row["win_rate"] = (round(row["wins"] / row["games"] * 100, 1)
+                           if row["games"] else None)
+        played = side_games.get(label, 0)
+        row["share"] = round(row["games"] / played * 100, 1) if played else None
+        rows.append(row)
+    rows.sort(key=lambda r: (-r["games"], r["heroes"]))
+    return rows[:top]
+
+
+def hero_matchups(lineups, min_games=2, team=None, roster_only=False, top=60):
+    """
+    What tends to show up on the OTHER side when a hero is picked.
+
+    The Billy/Abrams question: of the games where one side took hero X, in
+    how many did the opposing side take hero Y.
+
+    -> [{'hero','answer','games','picks','answer_rate','wins','win_rate'}]
+       picks       games where `hero` was picked at all
+       answer_rate share of those where `answer` was opposite
+       win_rate    how `hero`'s side did in that specific matchup
+    """
+    picks = Counter()
+    pair = {}
+    for m in lineups:
+        sides = list(m["sides"].items())
+        if len(sides) < 2:
+            continue
+        for side, group in sides:
+            others = [g for s, g in sides if s != side]
+            enemy = [p for g in others for p in g]
+            mine = [p for p in group if p["is_roster"]] if roster_only \
+                else list(group)
+            if team and _side_team(mine) != team:
+                continue
+            won = None if m["winner"] is None else (side == m["winner"])
+
+            for hero in {p["hero"] for p in mine}:
+                picks[hero] += 1
+                for foe in {p["hero"] for p in enemy}:
+                    row = pair.setdefault((hero, foe), {
+                        "hero": hero, "answer": foe, "games": 0, "wins": 0})
+                    row["games"] += 1
+                    if won:
+                        row["wins"] += 1
+
+    rows = []
+    for (hero, _), row in pair.items():
+        if row["games"] < min_games:
+            continue
+        seen = picks.get(hero, 0)
+        row["picks"] = seen
+        row["answer_rate"] = round(row["games"] / seen * 100, 1) if seen else None
+        row["win_rate"] = (round(row["wins"] / row["games"] * 100, 1)
+                           if row["games"] else None)
+        rows.append(row)
+    rows.sort(key=lambda r: (-(r["answer_rate"] or 0), -r["games"]))
+    return rows[:top]
+
+
+def lineup_teams(lineups, roster_only=True):
+    """Every side label present, for a picker."""
+    seen = Counter()
+    for m in lineups:
+        for group in m["sides"].values():
+            picked = [p for p in group if p["is_roster"]] if roster_only \
+                else group
+            label = _side_team(picked)
+            if label:
+                seen[label] += 1
+    return [t for t, _ in seen.most_common()]
