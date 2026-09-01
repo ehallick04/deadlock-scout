@@ -20,7 +20,7 @@ from api import cache_info, clear_cache, export_cache, import_cache
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
     WITH_CUSTOMS, build_report, build_team_report, composition_counts,
-    ABILITY_STYLES, ability_order, ability_rows, buy_order,
+    ABILITY_STYLES, ability_order, ability_rows, ability_slots, buy_order,
     buy_order_by_player, flatten,
     flow_edges, flow_rows, hero_names, hero_totals, item_flow, match_compositions,
     parse_ids, phase_label,
@@ -433,6 +433,15 @@ def load_buy_order_players(ids_tuple, labels_tuple, hero_id, days,
 
 
 @st.cache_data(ttl=7 * 24 * 3600, show_spinner=False)
+def load_ability_slots(hero_id):
+    """{ability_id: 1-4} from the cached hero + item assets."""
+    try:
+        return ability_slots(hero_id)
+    except Exception:
+        return {}
+
+
+@st.cache_data(ttl=7 * 24 * 3600, show_spinner=False)
 def load_hero_names():
     try:
         return hero_names()
@@ -790,11 +799,17 @@ with tab_items:
             help="Numbers are the 1/2/3/4 slots from the hero's asset. "
                  "Anything outside those four (an innate, say) keeps its "
                  "name.")
+        slots = load_ability_slots(hero_id)
+        if style != "Names" and not slots:
+            st.warning(
+                f"No slot numbers for {hero_choice} — its hero asset does not "
+                "name the four signature slots, so this falls back to ability "
+                "names.")
         try:
             arows = ability_rows(
                 load_ability_raw(tuple(ids), hero_id, days, match_mode,
                                  min_matches),
-                hero_id=hero_id, style=style)
+                hero_id=hero_id, style=style, slots=slots)
         except Exception as e:
             arows, _ = [], st.error(f"Could not load ability order: {e}")
         if not arows:

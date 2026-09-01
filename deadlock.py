@@ -1101,13 +1101,24 @@ def _class_to_id(refresh=False):
     return out
 
 
+def _norm_slot(key):
+    """`Signature1`, `signature_1`, `SIGNATURE1` -> `signature1`."""
+    return re.sub(r"[^a-z0-9]", "", str(key).lower())
+
+
 def ability_slots(hero_id, refresh=False):
     """
     {ability_id: 1|2|3|4} for one hero.
 
-    Empty when the hero is unknown or the assets do not carry slot names --
-    callers fall back to ability names, so an empty map degrades to today's
-    behaviour rather than breaking.
+    The hero asset's `items` map is keyed by slot name. The API serializes
+    those keys as snake_case (`signature1`) even though the schema enum
+    spells them `Signature1`, so keys are compared with punctuation and case
+    stripped -- either spelling resolves.
+
+    Values are normally an ability's class_name, but an id is accepted too.
+
+    Empty when the hero is unknown or the assets carry no slot names, and
+    callers then fall back to ability names.
     """
     hero = next((h for h in _walk_dicts(heroes(refresh))
                  if h.get("id") == hero_id and isinstance(h.get("items"), dict)),
@@ -1115,13 +1126,18 @@ def ability_slots(hero_id, refresh=False):
     if not hero:
         return {}
 
+    bound = {_norm_slot(k): v for k, v in hero["items"].items()}
     by_class = _class_to_id(refresh)
+
     slots = {}
     for position, slot in enumerate(SIGNATURE_SLOTS, start=1):
-        class_name = hero["items"].get(slot)
-        if not isinstance(class_name, str):
+        value = bound.get(_norm_slot(slot))
+        if isinstance(value, int):
+            ability_id = value
+        elif isinstance(value, str):
+            ability_id = by_class.get(value)
+        else:
             continue
-        ability_id = by_class.get(class_name)
         if isinstance(ability_id, int):
             slots[ability_id] = position
     return slots
@@ -1151,7 +1167,8 @@ def format_order(ability_ids, names=None, slots=None, style="Names"):
     return " > ".join(parts)
 
 
-def ability_rows(raw, names=None, top=25, hero_id=None, style="Names"):
+def ability_rows(raw, names=None, top=25, hero_id=None, style="Names",
+                 slots=None):
     """
     AnalyticsAbilityOrderStats carries `abilities` -- the upgrade order as a
     list of ability ids. One row per distinct order.
@@ -1167,12 +1184,13 @@ def ability_rows(raw, names=None, top=25, hero_id=None, style="Names"):
         except Exception:
             names = {}
 
-    slots = {}
-    if style in ("Numbers", "Both") and hero_id is not None:
-        try:
-            slots = ability_slots(hero_id)
-        except Exception:
-            slots = {}
+    if slots is None:
+        slots = {}
+        if style in ("Numbers", "Both") and hero_id is not None:
+            try:
+                slots = ability_slots(hero_id)
+            except Exception:
+                slots = {}
 
     nodes = raw if isinstance(raw, list) else None
     if nodes is None:
