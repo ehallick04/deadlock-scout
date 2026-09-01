@@ -20,7 +20,9 @@ from api import cache_info, clear_cache, export_cache, import_cache
 from deadlock import (
     CUSTOMS_ONLY, DEFAULT_DAYS, DEFAULT_GAME_MODE, DEFAULT_MATCH_MODE,
     WITH_CUSTOMS, build_report, build_team_report, composition_counts,
-    flatten, hero_totals, match_compositions, parse_ids,
+    ability_order, ability_rows, buy_order, buy_order_by_player, flatten,
+    flow_edges, flow_rows, hero_names, hero_totals, item_flow, match_compositions,
+    parse_ids, phase_label,
 )
 from roster_import import BOOKMARKLET, HARVESTER, find_teams, parse_any
 from teams import LEAGUE, PINNED, TEAMS, divisions, roster_many
@@ -387,8 +389,58 @@ def load_comps(match_ids, roster_ids, labels_tuple, limit):
                               limit=limit)
 
 
-tab_hero, tab_player, tab_team, tab_match, tab_data = st.tabs(
-    ["By hero", "By player", "By team", "Matches", "Raw data"])
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_buy_order(ids_tuple, hero_id, days, match_mode, min_matches):
+    """Pooled buy order for everyone selected. One request."""
+    return buy_order(list(ids_tuple), hero_id=hero_id, days=days,
+                     match_mode=match_mode, min_matches=min_matches)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_buy_raw(ids_tuple, hero_id, days, match_mode, min_matches):
+    from api import get_json
+    import time as _t
+    params = {"min_unix_timestamp": int(_t.time()) - days * 86400,
+              "min_matches": min_matches, "match_mode": match_mode or None}
+    if ids_tuple:
+        params["account_ids"] = ",".join(str(a) for a in ids_tuple)
+    if hero_id is not None:
+        params["hero_id"] = hero_id
+    return get_json("/v1/analytics/item-stats", **params)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_flow_raw(ids_tuple, hero_id, days, match_mode, min_matches):
+    return item_flow(list(ids_tuple), hero_id=hero_id, days=days,
+                     match_mode=match_mode, min_matches=min_matches)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_ability_raw(ids_tuple, hero_id, days, match_mode, min_matches):
+    return ability_order(hero_id, list(ids_tuple), days=days,
+                         match_mode=match_mode, min_matches=min_matches)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_buy_order_players(ids_tuple, labels_tuple, hero_id, days,
+                           match_mode, min_matches):
+    """One request per player, so it is behind a button."""
+    labels = {k: dict(v) for k, v in labels_tuple}
+    return buy_order_by_player(list(ids_tuple), labels, hero_id=hero_id,
+                               days=days, match_mode=match_mode,
+                               min_matches=min_matches)
+
+
+@st.cache_data(ttl=7 * 24 * 3600, show_spinner=False)
+def load_hero_names():
+    try:
+        return hero_names()
+    except Exception:
+        return {}
+
+
+tab_hero, tab_player, tab_team, tab_match, tab_items, tab_data = st.tabs(
+    ["By hero", "By player", "By team", "Matches", "Build order", "Raw data"])
 
 # ---- pooled hero win rates
 with tab_hero:
@@ -544,6 +596,214 @@ with tab_match:
                             hide_index=True, use_container_width=True)
 
 # ---- everything, downloadable
+# ---- build order: what gets bought, when, and in what sequence
+with tab_items:
+    ic1, ic2, ic3 = st.columns([2, 1, 1])
+    names_by_id = load_hero_names()
+    hero_choice = ic1.selectbox(
+        "Hero", ["All heroes"] + [names_by_id[h] for h in sorted(
+            names_by_id, key=lambda h: names_by_id[h] or "")])
+    hero_id = None
+    if hero_choice != "All heroes":
+        hero_id = next((h for h, n in names_by_id.items() if n == hero_choice),
+                       None)
+    min_matches = whole_number(
+        ic2.text_input("Min matches per item", value="1"),
+        1, "Min matches", minimum=1, maximum=1000)
+    top_items = whole_number(
+        ic3.text_input("Rows shown", value="40"),
+        40, "Rows shown", minimum=1, maximum=500)
+
+    key = (tuple(ids), hero_id, days, match_mode, min_matches)
+    view = st.radio("View", ["Buy order", "By phase", "What follows what"],
+                    horizontal=True, label_visibility="collapsed")
+
+    # ---------------------------------------------------------- buy order
+    if view == "Buy order":
+        st.caption("From item-stats: every item these players bought, sorted "
+                   "by the average clock time they bought it at. Reading down "
+                   "the table is reading the build.")
+        try:
+            rows = load_buy_order(*key)
+        except Exception as e:
+            rows, _ = [], st.error(f"Could not load buy order: {e}")
+
+        if not rows:
+            st.info("Nothing came back. Widen the window, lower **Min "
+                    "matches**, or loosen the match modes — custom lobbies "
+                    "alone are a thin sample.")
+            with st.expander("What the API actually returned"):
+                try:
+                    st.json(load_buy_raw(*key))
+                except Exception as e:
+                    st.write(f"(request failed: {e})")
+        else:
+            frame = pd.DataFrame(rows)
+            st.caption(f"{len(frame)} items.")
+            st.dataframe(
+                frame.head(top_items)[
+                    ["buy_time", "item", "buys", "players", "win_rate"]],
+                hide_index=True, use_container_width=True,
+                column_config={
+                    "buy_time": st.column_config.TextColumn("Bought at",
+                                                            width="small"),
+                    "item": "Item",
+                    "buys": st.column_config.NumberColumn("Buys"),
+                    "players": st.column_config.NumberColumn("Players"),
+                    "win_rate": st.column_config.ProgressColumn(
+                        "Win rate", format="%.1f%%", min_value=0,
+                        max_value=100),
+                })
+            st.download_button("Download buy order (CSV)",
+                               frame.to_csv(index=False).encode(),
+                               file_name="buy_order.csv", mime="text/csv")
+
+    # ---------------------------------------------------------- by phase
+    elif view == "By phase":
+        st.caption("From item-flow-stats: purchases bucketed into 10-minute "
+                   "phases. **Adj. WR** re-weights win rate across net-worth "
+                   "buckets, so it is not just measuring who was already "
+                   "ahead.")
+        try:
+            raw = load_flow_raw(*key)
+            rows = flow_rows(raw)
+        except Exception as e:
+            raw, rows = None, []
+            st.error(f"Could not load build flow: {e}")
+
+        if not rows:
+            st.info("Nothing came back at these filters.")
+            if raw is not None:
+                with st.expander("What the API actually returned"):
+                    st.json(raw)
+        else:
+            frame = pd.DataFrame(rows)
+            reached = (raw or {}).get("reached_per_column") or []
+            if reached:
+                st.caption("Games reaching each phase: "
+                           + ", ".join(f"{phase_label(i)}: {n}"
+                                       for i, n in enumerate(reached)))
+            st.dataframe(
+                frame.head(top_items)[["window", "item", "buys", "pick_rate",
+                                       "win_rate", "adj_win_rate"]],
+                hide_index=True, use_container_width=True,
+                column_config={
+                    "window": st.column_config.TextColumn("Phase",
+                                                          width="small"),
+                    "item": "Item",
+                    "buys": st.column_config.NumberColumn("Buys"),
+                    "pick_rate": st.column_config.NumberColumn(
+                        "Pick rate", format="%.1f%%"),
+                    "win_rate": st.column_config.ProgressColumn(
+                        "Win rate", format="%.1f%%", min_value=0,
+                        max_value=100),
+                    "adj_win_rate": st.column_config.NumberColumn(
+                        "Adj. WR", format="%.1f%%"),
+                })
+            st.download_button("Download phases (CSV)",
+                               frame.to_csv(index=False).encode(),
+                               file_name="build_phases.csv", mime="text/csv")
+
+    # ---------------------------------------------------- transitions
+    else:
+        st.caption("From the flow graph's edges: when they bought the item on "
+                   "the left, what did they buy next.")
+        try:
+            edges = flow_edges(load_flow_raw(*key))
+        except Exception as e:
+            edges, _ = [], st.error(f"Could not load transitions: {e}")
+        if not edges:
+            st.info("No transitions at these filters — usually too few games.")
+        else:
+            eframe = pd.DataFrame(edges)
+            st.dataframe(
+                eframe.head(top_items)[["from", "to", "matches", "win_rate"]],
+                hide_index=True, use_container_width=True,
+                column_config={
+                    "from": "Bought", "to": "Then bought",
+                    "matches": st.column_config.NumberColumn("Games"),
+                    "win_rate": st.column_config.ProgressColumn(
+                        "Win rate", format="%.1f%%", min_value=0,
+                        max_value=100),
+                })
+            st.download_button("Download transitions (CSV)",
+                               eframe.to_csv(index=False).encode(),
+                               file_name="build_transitions.csv",
+                               mime="text/csv")
+
+    # ------------------------------------------------ per-player breakdown
+    st.divider()
+    st.subheader("Per player")
+    st.caption(f"One request per player — {len(ids)} selected, paced under the "
+               "analytics rate limit. Cached for an hour once loaded.")
+    if st.button("Load per-player buy order"):
+        st.session_state.item_players = True
+
+    if st.session_state.get("item_players"):
+        labels_tuple = tuple(
+            (k, tuple(sorted(v.items()))) for k, v in sorted(labels.items()))
+        try:
+            prows = load_buy_order_players(tuple(ids), labels_tuple, hero_id,
+                                           days, match_mode, min_matches)
+        except Exception as e:
+            prows, _ = [], st.error(f"Could not load per-player order: {e}")
+
+        if not prows:
+            st.info("No per-player rows — usually too thin a sample once it "
+                    "is split by player.")
+        else:
+            pframe = pd.DataFrame(prows)
+            everyone = sorted(pframe["player"].unique())
+            who = st.multiselect("Players", everyone, default=everyone)
+            sub = pframe[pframe["player"].isin(who)]
+            sub = sub.sort_values(
+                ["player", "avg_buy_s"] if "avg_buy_s" in sub.columns
+                else ["player"])
+            st.dataframe(
+                sub[["player", "buy_time", "item", "buys", "win_rate"]],
+                hide_index=True, use_container_width=True,
+                column_config={
+                    "player": "Player",
+                    "buy_time": st.column_config.TextColumn("Bought at",
+                                                            width="small"),
+                    "item": "Item",
+                    "buys": st.column_config.NumberColumn("Buys"),
+                    "win_rate": st.column_config.ProgressColumn(
+                        "Win rate", format="%.1f%%", min_value=0,
+                        max_value=100),
+                })
+            st.download_button("Download per-player buy order (CSV)",
+                               pframe.to_csv(index=False).encode(),
+                               file_name="buy_order_by_player.csv",
+                               mime="text/csv")
+
+    # ------------------------------------------------ ability point order
+    st.divider()
+    st.subheader("Ability point order")
+    if hero_id is None:
+        st.caption("Pick a hero above — this endpoint needs one.")
+    else:
+        try:
+            arows = ability_rows(load_ability_raw(tuple(ids), hero_id, days,
+                                                  match_mode, min_matches))
+        except Exception as e:
+            arows, _ = [], st.error(f"Could not load ability order: {e}")
+        if not arows:
+            st.info(f"No ability orders for {hero_choice} at these filters.")
+        else:
+            aframe = pd.DataFrame(arows)
+            st.dataframe(
+                aframe[["order", "matches", "win_rate"]],
+                hide_index=True, use_container_width=True,
+                column_config={
+                    "order": "Upgrade order",
+                    "matches": st.column_config.NumberColumn("Games"),
+                    "win_rate": st.column_config.ProgressColumn(
+                        "Win rate", format="%.1f%%", min_value=0,
+                        max_value=100),
+                })
+
+
 with tab_data:
     st.dataframe(df, hide_index=True, use_container_width=True)
     safe = preset.replace(" ", "_").replace("—", "").lower()

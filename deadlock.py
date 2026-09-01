@@ -780,3 +780,338 @@ def composition_counts(compositions, roster_ids=()):
     for row in tally.values():
         row["win_rate"] = round(row["wins"] / row["games"] * 100, 1) if row["games"] else 0.0
     return sorted(tally.values(), key=lambda r: -r["games"])
+
+
+# --------------------------------------------------------------- items
+
+ITEMS_FILE = "items.json"
+
+# Field names below are taken from the API's own OpenAPI schemas:
+#   ItemStats      item_id bucket wins losses matches players
+#                  avg_buy_time_s avg_sell_time_s
+#                  avg_buy_time_relative avg_sell_time_relative
+#   ItemFlowNode   column item_id wins losses matches players
+#                  adjusted_win_rate avg_net_worth_at_buy
+#   ItemFlowEdge   from_column from_item_id to_item_id wins losses matches
+#   ItemFlowStats  nodes edges summary baseline reached_per_column
+#   AnalyticsAbilityOrderStats  abilities[] wins losses matches players
+# _pick() still tries a few aliases so a rename upstream degrades instead
+# of crashing.
+
+PHASE_KEYS = ("column", "phase", "phase_index", "stage")
+ITEM_KEYS = ("item_id", "id", "upgrade_id", "ability_id")
+COUNT_KEYS = ("matches", "games", "count", "total")
+WIN_KEYS = ("wins", "win_count")
+RATE_KEYS = ("win_rate", "winrate")
+
+# analytics endpoints share one budget: 200 req/min per IP
+ANALYTICS_PAUSE = 0.35
+
+
+def items(refresh=False):
+    """The full item asset list, cached to items.json. Abilities included."""
+    return get_cached("/v1/assets/items", ITEMS_FILE, refresh=refresh)
+
+
+def item_names(refresh=False):
+    """{item_id: name} covering both shop items and hero abilities."""
+    out = {}
+    for it in _walk_dicts(items(refresh)):
+        iid = it.get("id")
+        name = it.get("name") or it.get("class_name")
+        if isinstance(iid, int) and name:
+            out.setdefault(iid, name)
+    return out
+
+
+def _pick(node, keys, default=None):
+    """First present, non-None value among `keys`."""
+    for k in keys:
+        v = node.get(k)
+        if v is not None:
+            return v
+    return default
+
+
+def _win_rate(node, games, wins):
+    """Win rate as a percentage, however the endpoint expressed it."""
+    raw = _pick(node, RATE_KEYS)
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return round(raw * 100 if raw <= 1 else raw, 1)
+    if games:
+        return round((wins or 0) / games * 100, 1)
+    return None
+
+
+def _adjusted(node):
+    """adjusted_win_rate, normalised to a percentage. May be absent."""
+    raw = node.get("adjusted_win_rate")
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return round(raw * 100 if raw <= 1 else raw, 1)
+    return None
+
+
+def mmss(seconds):
+    """1234.5 -> '20:34'. Buy times read better as clock time."""
+    if seconds is None:
+        return ""
+    s = int(round(seconds))
+    return f"{s // 60}:{s % 60:02d}"
+
+
+def _window(days, match_mode, min_matches, account_ids=(), hero_id=None,
+            hero_key="hero_id"):
+    params = {
+        "min_unix_timestamp": int(time.time()) - days * 86400,
+        "min_matches": min_matches,
+        "match_mode": match_mode or None,
+    }
+    if account_ids:
+        params["account_ids"] = ",".join(str(a) for a in account_ids)
+    if hero_id is not None:
+        params[hero_key] = hero_id
+    return params
+
+
+# ---- buy order: item-stats, sorted by when the item is actually bought
+
+def buy_order(account_ids=(), hero_id=None, days=DEFAULT_DAYS,
+              match_mode=CUSTOMS_ONLY, min_matches=1, refresh=False,
+              names=None):
+    """
+    What gets bought, in the order it gets bought.
+
+    Reads /v1/analytics/item-stats, which carries `avg_buy_time_s` per item,
+    so sorting by it gives a real timeline rather than a bucket.
+
+    -> [{'item','item_id','buys','players','avg_buy_s','buy_time',
+         'buy_pct','wins','win_rate','avg_sell_s'}]
+    """
+    raw = get_json("/v1/analytics/item-stats", refresh=refresh,
+                   **_window(days, match_mode, min_matches, account_ids,
+                             hero_id))
+    return buy_rows(raw, names)
+
+
+def buy_rows(raw, names=None):
+    """Normalise an item-stats response. Safe on an unexpected shape."""
+    if names is None:
+        try:
+            names = item_names()
+        except Exception:
+            names = {}
+
+    nodes = raw if isinstance(raw, list) else None
+    if nodes is None:
+        nodes = [d for d in _walk_dicts(raw) if _pick(d, ITEM_KEYS) is not None]
+
+    rows = []
+    for n in nodes:
+        if not isinstance(n, dict):
+            continue
+        item_id = _pick(n, ITEM_KEYS)
+        if item_id is None:
+            continue
+        games = _pick(n, COUNT_KEYS, 0) or 0
+        wins = _pick(n, WIN_KEYS) or 0
+        buy_s = n.get("avg_buy_time_s")
+        rows.append({
+            "item": names.get(item_id, f"item {item_id}"),
+            "item_id": item_id,
+            "buys": games,
+            "players": n.get("players"),
+            "avg_buy_s": buy_s,
+            "buy_time": mmss(buy_s),
+            "buy_pct": n.get("avg_buy_time_relative"),
+            "avg_sell_s": n.get("avg_sell_time_s"),
+            "wins": wins,
+            "win_rate": _win_rate(n, games, wins),
+        })
+
+    # unknown buy time sorts last rather than first
+    rows.sort(key=lambda r: (r["avg_buy_s"] is None,
+                             r["avg_buy_s"] or 0, -r["buys"]))
+    return rows
+
+
+def buy_order_by_player(account_ids, labels=None, hero_id=None,
+                        days=DEFAULT_DAYS, match_mode=CUSTOMS_ONLY,
+                        min_matches=1, pause=ANALYTICS_PAUSE, refresh=False):
+    """
+    buy_order() computed one player at a time.
+    -> the same rows, each carrying 'player' and 'account_id'.
+    """
+    labels = labels or {}
+    try:
+        names = item_names()
+    except Exception:
+        names = {}
+
+    out = []
+    for account_id in account_ids:
+        try:
+            rows = buy_order([account_id], hero_id, days, match_mode,
+                             min_matches, refresh, names)
+        except urllib.error.HTTPError:
+            continue
+        who = labels.get(account_id, {})
+        for r in rows:
+            out.append({"player": who.get("ign") or str(account_id),
+                        "account_id": account_id, **r})
+        time.sleep(pause)
+    return out
+
+
+# ---- build flow: the same purchases grouped into phases, plus transitions
+
+def item_flow(account_ids=(), hero_id=None, days=DEFAULT_DAYS,
+              match_mode=CUSTOMS_ONLY, min_matches=1, phase_count=4,
+              phase_interval_s=600, refresh=False):
+    """Raw /v1/analytics/item-flow-stats response (nodes, edges, summary)."""
+    params = _window(days, match_mode, min_matches, account_ids, hero_id,
+                     hero_key="hero_ids")
+    params["phase_count"] = phase_count
+    params["phase_interval_s"] = phase_interval_s
+    return get_json("/v1/analytics/item-flow-stats", refresh=refresh, **params)
+
+
+def phase_label(column, phase_interval_s=600):
+    """Column 1 with a 600s interval -> '10-20 min'."""
+    lo = column * phase_interval_s // 60
+    hi = (column + 1) * phase_interval_s // 60
+    return f"{lo}-{hi} min"
+
+
+def flow_rows(raw, names=None, phase_interval_s=600):
+    """
+    item-flow nodes as rows.
+    -> [{'phase','window','item','item_id','buys','players','pick_rate',
+         'win_rate','adj_win_rate','avg_net_worth_at_buy'}]
+    """
+    if names is None:
+        try:
+            names = item_names()
+        except Exception:
+            names = {}
+
+    nodes = raw.get("nodes") if isinstance(raw, dict) else None
+    if not isinstance(nodes, list):
+        nodes = [d for d in _walk_dicts(raw)
+                 if _pick(d, ITEM_KEYS) is not None
+                 and _pick(d, PHASE_KEYS) is not None]
+
+    summary = raw.get("summary") if isinstance(raw, dict) else None
+    pool = (summary or {}).get("matches") if isinstance(summary, dict) else None
+
+    rows = []
+    for n in nodes:
+        if not isinstance(n, dict):
+            continue
+        item_id = _pick(n, ITEM_KEYS)
+        if item_id is None:
+            continue
+        games = _pick(n, COUNT_KEYS, 0) or 0
+        wins = _pick(n, WIN_KEYS) or 0
+        column = _pick(n, PHASE_KEYS, 0)
+        rows.append({
+            "phase": column,
+            "window": phase_label(column, phase_interval_s),
+            "item": names.get(item_id, f"item {item_id}"),
+            "item_id": item_id,
+            "buys": games,
+            "players": n.get("players"),
+            "pick_rate": round(games / pool * 100, 1) if pool else None,
+            "win_rate": _win_rate(n, games, wins),
+            "adj_win_rate": _adjusted(n),
+            "avg_net_worth_at_buy": n.get("avg_net_worth_at_buy"),
+        })
+
+    rows.sort(key=lambda r: (r["phase"], -r["buys"]))
+    return rows
+
+
+def flow_edges(raw, names=None, min_matches=1):
+    """
+    Which item tends to follow which.
+    -> [{'from','to','from_phase','matches','win_rate'}] most common first.
+    """
+    if names is None:
+        try:
+            names = item_names()
+        except Exception:
+            names = {}
+
+    edges = raw.get("edges") if isinstance(raw, dict) else None
+    if not isinstance(edges, list):
+        return []
+
+    out = []
+    for e in edges:
+        if not isinstance(e, dict):
+            continue
+        games = _pick(e, COUNT_KEYS, 0) or 0
+        if games < min_matches:
+            continue
+        wins = _pick(e, WIN_KEYS) or 0
+        src, dst = e.get("from_item_id"), e.get("to_item_id")
+        out.append({
+            "from": names.get(src, f"item {src}"),
+            "to": names.get(dst, f"item {dst}"),
+            "from_phase": e.get("from_column"),
+            "matches": games,
+            "win_rate": _win_rate(e, games, wins),
+        })
+    out.sort(key=lambda r: -r["matches"])
+    return out
+
+
+# ---- ability point order
+
+def ability_order(hero_id, account_ids=(), days=DEFAULT_DAYS,
+                  match_mode=CUSTOMS_ONLY, min_matches=1, refresh=False):
+    """
+    Ability-point order for one hero. hero_id is required by the endpoint.
+    -> raw response; ability_rows() flattens it.
+    """
+    if hero_id is None:
+        raise ValueError("ability_order needs a hero_id")
+    return get_json("/v1/analytics/ability-order-stats", refresh=refresh,
+                    **_window(days, match_mode, min_matches, account_ids,
+                              hero_id))
+
+
+def ability_rows(raw, names=None, top=25):
+    """
+    AnalyticsAbilityOrderStats carries `abilities` -- the upgrade order as a
+    list of ability ids. One row per distinct order.
+
+    -> [{'order','ability_ids','matches','players','win_rate'}]
+    """
+    if names is None:
+        try:
+            names = item_names()
+        except Exception:
+            names = {}
+
+    nodes = raw if isinstance(raw, list) else None
+    if nodes is None:
+        nodes = [d for d in _walk_dicts(raw) if isinstance(d.get("abilities"),
+                                                           list)]
+    rows = []
+    for n in nodes:
+        if not isinstance(n, dict):
+            continue
+        order = n.get("abilities")
+        if not isinstance(order, list):
+            continue
+        games = _pick(n, COUNT_KEYS, 0) or 0
+        wins = _pick(n, WIN_KEYS) or 0
+        rows.append({
+            "order": " > ".join(names.get(a, str(a)) for a in order),
+            "ability_ids": order,
+            "matches": games,
+            "players": n.get("players"),
+            "win_rate": _win_rate(n, games, wins),
+        })
+    rows.sort(key=lambda r: -r["matches"])
+    return rows[:top]
