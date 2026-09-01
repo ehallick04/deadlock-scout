@@ -1455,6 +1455,10 @@ def match_builds(match_ids, account_ids=(), labels=None, limit=60,
             continue
 
         winner = _match_winner(md)
+        side_keys = {_pick(p, TEAM_KEYS) for p in _walk_dicts(md)
+                     if isinstance(p.get("account_id"), int)
+                     and p["account_id"] > 0}
+        side_keys = {k for k in side_keys if isinstance(k, int)}
         for player in _walk_dicts(md):
             account_id = player.get("account_id")
             if not isinstance(account_id, int) or account_id <= 0:
@@ -1469,8 +1473,10 @@ def match_builds(match_ids, account_ids=(), labels=None, limit=60,
             hero_id = player.get("hero_id")
             team = _pick(player, TEAM_KEYS)
             won = None
-            if winner is not None and isinstance(team, int):
-                won = (team == winner)
+            if isinstance(team, int):
+                champ = resolve_winner(winner, side_keys)
+                if champ is not None:
+                    won = (team == champ)
 
             who = labels.get(account_id, {})
             for e in entries:
@@ -1689,6 +1695,9 @@ def bulk_match_metadata(account_ids=(), days=DEFAULT_DAYS,
     """
     params = {
         "include_info": "true",
+        # the winning team lives behind this flag, and without it every
+        # outcome comes back unknown and win rates render blank
+        "include_more_info": "true",
         "include_player_info": "true",
         "match_mode": match_mode or None,
         "limit": max(1, min(int(limit), 10000)),
@@ -1722,6 +1731,11 @@ def _match_rows(match, account_ids=None, labels=None, names=None,
     winner = _match_winner(match)
     start = _pick(match, START_KEYS)
 
+    # the sides present in this match, so the winner value can be mapped
+    side_keys = {_pick(p, TEAM_KEYS) for p in _walk_dicts(match)
+                 if isinstance(p.get("account_id"), int) and p["account_id"] > 0}
+    side_keys = {k for k in side_keys if isinstance(k, int)}
+
     rows = []
     for player in _walk_dicts(match):
         account_id = player.get("account_id")
@@ -1736,8 +1750,10 @@ def _match_rows(match, account_ids=None, labels=None, names=None,
         hero_id = player.get("hero_id")
         team = _pick(player, TEAM_KEYS)
         won = None
-        if winner is not None and isinstance(team, int):
-            won = (team == winner)
+        if isinstance(team, int):
+            champ = resolve_winner(winner, side_keys)
+            if champ is not None:
+                won = (team == champ)
         who = labels.get(account_id, {})
 
         for e in entries:
@@ -1831,7 +1847,9 @@ def bulk_matches(raw):
             "duration_s": _pick(m, DURATION_KEYS),
             "match_mode": m.get("match_mode"),
             "game_mode": m.get("game_mode"),
-            "winning_team": _match_winner(m),
+            "winning_team": resolve_winner(
+                _match_winner(m),
+                {p["team"] for p in players if isinstance(p.get("team"), int)}),
             "average_badge": m.get("average_badge"),
             "players": players,
         })
@@ -1876,6 +1894,58 @@ def bulk_participants(match_ids, account_ids=(), days=None,
             if players:
                 out[mid] = players
     return out
+
+
+def winner_offset(lineups):
+    """
+    Work out, across every match at once, how the reported winner value lines
+    up with the side keys.
+
+    One match cannot settle it -- a winner of 1 against sides 0/1 could be a
+    direct hit or a value shifted by one. The whole set can: if no reported
+    winner is ever a valid side but every one of them is after a shift, the
+    source is using the other convention.
+
+    -> 0, -1, +1, or None when it cannot be told.
+    """
+    winners, sides = set(), set()
+    for m in lineups:
+        w = m.get("winner")
+        if isinstance(w, int) and not isinstance(w, bool):
+            winners.add(w)
+        sides |= {k for k in m.get("sides", {}) if isinstance(k, int)}
+    if not winners or not sides:
+        return None
+    if winners <= sides:
+        return 0
+    for shift in (-1, 1):
+        if {w + shift for w in winners} <= sides:
+            return shift
+    return None
+
+
+def resolve_winner(winner, side_keys):
+    """
+    Map a reported winning-team value onto the side keys actually present.
+
+    The blob does not always number the winner the way it numbers players:
+    sides can be 0/1 while `winning_team` is 1/2. Comparing them directly
+    then makes one side never match, so every game reads as a loss and the
+    win rate pins to 0%. Anything that cannot be resolved returns None, so
+    the rate shows as unknown instead of as zero.
+    """
+    if winner is None:
+        return None
+    keys = [k for k in side_keys if isinstance(k, int)]
+    if not keys:
+        return None
+    if winner in keys:
+        return winner
+    if len(keys) == 2:
+        for shift in (-1, 1):
+            if winner + shift in keys:
+                return winner + shift
+    return None
 
 
 def side_label(teams, joiner="/"):
@@ -2003,6 +2073,7 @@ def hero_combos(lineups, size=3, team=None, roster_only=True, min_games=2,
     """
     from itertools import combinations
 
+    shift = winner_offset(lineups)
     tally, side_games = {}, Counter()
     for m in lineups:
         for side, group in m["sides"].items():
@@ -2014,23 +2085,26 @@ def hero_combos(lineups, size=3, team=None, roster_only=True, min_games=2,
             if team and label != team:
                 continue
             side_games[label] += 1
-            won = None if m["winner"] is None else (side == m["winner"])
+            champ = (None if shift is None or m["winner"] is None
+                     else resolve_winner(m["winner"] + shift, m["sides"]))
+            won = None if champ is None else (side == champ)
             for combo in combinations(sorted({p["hero"] for p in picked}),
                                       size):
                 key = (label, combo)
                 row = tally.setdefault(key, {"heroes": " + ".join(combo),
                                              "team": label, "games": 0,
-                                             "wins": 0})
+                                             "wins": 0, "decided": 0})
                 row["games"] += 1
-                if won:
-                    row["wins"] += 1
+                if won is not None:
+                    row["decided"] += 1
+                    row["wins"] += 1 if won else 0
 
     rows = []
     for (label, _), row in tally.items():
         if row["games"] < min_games:
             continue
-        row["win_rate"] = (round(row["wins"] / row["games"] * 100, 1)
-                           if row["games"] else None)
+        row["win_rate"] = (round(row["wins"] / row["decided"] * 100, 1)
+                           if row["decided"] else None)
         played = side_games.get(label, 0)
         row["share"] = round(row["games"] / played * 100, 1) if played else None
         rows.append(row)
@@ -2050,6 +2124,7 @@ def hero_matchups(lineups, min_games=2, team=None, roster_only=False, top=60):
        answer_rate share of those where `answer` was opposite
        win_rate    how `hero`'s side did in that specific matchup
     """
+    shift = winner_offset(lineups)
     picks = Counter()
     pair = {}
     for m in lineups:
@@ -2063,16 +2138,20 @@ def hero_matchups(lineups, min_games=2, team=None, roster_only=False, top=60):
                 else list(group)
             if team and _side_team(mine) != team:
                 continue
-            won = None if m["winner"] is None else (side == m["winner"])
+            champ = (None if shift is None or m["winner"] is None
+                     else resolve_winner(m["winner"] + shift, m["sides"]))
+            won = None if champ is None else (side == champ)
 
             for hero in {p["hero"] for p in mine}:
                 picks[hero] += 1
                 for foe in {p["hero"] for p in enemy}:
                     row = pair.setdefault((hero, foe), {
-                        "hero": hero, "answer": foe, "games": 0, "wins": 0})
+                        "hero": hero, "answer": foe, "games": 0, "wins": 0,
+                        "decided": 0})
                     row["games"] += 1
-                    if won:
-                        row["wins"] += 1
+                    if won is not None:
+                        row["decided"] += 1
+                        row["wins"] += 1 if won else 0
 
     rows = []
     for (hero, _), row in pair.items():
@@ -2081,8 +2160,8 @@ def hero_matchups(lineups, min_games=2, team=None, roster_only=False, top=60):
         seen = picks.get(hero, 0)
         row["picks"] = seen
         row["answer_rate"] = round(row["games"] / seen * 100, 1) if seen else None
-        row["win_rate"] = (round(row["wins"] / row["games"] * 100, 1)
-                           if row["games"] else None)
+        row["win_rate"] = (round(row["wins"] / row["decided"] * 100, 1)
+                           if row["decided"] else None)
         rows.append(row)
     rows.sort(key=lambda r: (-(r["answer_rate"] or 0), -r["games"]))
     return rows[:top]

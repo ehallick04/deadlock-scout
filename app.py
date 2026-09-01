@@ -25,6 +25,7 @@ from deadlock import (
     flow_edges, flow_rows, hero_names, hero_totals, item_flow,
     match_build_order, match_builds, match_builds_bulk, match_compositions,
     bulk_lineups, hero_combos, hero_matchups, lineup_teams,
+    winner_offset,
     metadata_report, mirror_matches, parse_ids, phase_label,
     top_heroes_for,
     typical_builds,
@@ -797,6 +798,9 @@ with tab_comps:
         found = lineup_teams(lineups)
         st.caption(f"{len(lineups)} matches · sides seen: "
                    + ", ".join(found[:8]) if found else f"{len(lineups)} matches")
+        if winner_offset(lineups) is None:
+            st.warning("Match outcomes could not be matched to sides in this "
+                       "data, so win rates are blank rather than shown as 0%.")
 
         st.subheader("Comps they run")
         pick_team = st.selectbox("Side", ["Any"] + found, key="comp_team")
