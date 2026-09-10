@@ -670,17 +670,24 @@ def load_meta_buy_order(days, hero_id, min_matches):
 
 # --------------------------------------------------------------- sidebar
 
-# Three questions, three shapes of answer:
+# Four questions, four shapes of answer:
 #   Meta     the ladder at large -- no roster, no report needed
 #   Players  whoever you name: rosters, pasted ids, imported pages
 #   Pros     the pinned teams, custom games only
-MODES = ("Meta", "Players", "Pros")
+#   Drafts   tournament pick/ban screenshots, read and checked by hand
+MODES = ("Meta", "Players", "Pros", "Drafts")
 mode = st.sidebar.radio(
     "Looking at", MODES, index=1,
     help="Meta reads the whole ladder and needs nothing selected. "
          "Players scouts whoever you pick. Pros is the pinned rosters in "
-         "their custom games.")
+         "their custom games. Drafts is the Night Shift pick/ban archive.")
 st.sidebar.divider()
+
+# ---- Drafts: screenshots in, database out. Nothing roster-shaped applies.
+if mode == "Drafts":
+    import draft_page
+    draft_page.render()
+    st.stop()
 
 # ---- Meta: ladder-wide, so it short-circuits everything roster-shaped
 if mode == "Meta":

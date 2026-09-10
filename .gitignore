@@ -1,17 +1,40 @@
 .venv/
 __pycache__/
 *.pyc
-heroes.json
-cache/
-*.csv
 *.gz
 ids.txt
 Ids.txt
 .agents/
 .claude/
 
+# API assets and caches — all re-fetchable, none of it belongs in the repo
+heroes.json
+items.json
+ranks.json
+cache/
+*.csv
+
+# the local API store is rebuilt by syncing, so it is not committed
+deadlock.sqlite
+deadlock.sqlite-journal
+drafts.sqlite
+drafts.sqlite-journal
+
 # harvested source pages are inputs, not the deliverable --
 # rosters.json IS committed on purpose, so it is not listed here
 dse_rosters.html
 pages/
-items.json
+
+# screenshots are inputs; the reading of them is what gets kept
+shots/
+
+# drafts.jsonl is NOT ignored. It is hand-checked data that exists nowhere else
+# and cannot be re-fetched, so it is committed on purpose -- one line per draft,
+# so a night's entries read as a handful of added lines in the diff.
+drafts.jsonl.tmp
+
+# editor and rescue copies
+*.bak
+*.part
+_to_delete/
+.DS_Store
