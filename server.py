@@ -316,6 +316,27 @@ def stats():
         return json.load(response)
 
 
+def objectives(account_ids=None, days=90, match_mode=None, game_mode=None,
+               min_average_badge=0, limit=4000, min_events=30):
+    """
+    The objective report, from the server.
+
+    With no account_ids this describes the deliberate ladder sample. With them
+    it describes those players' games and returns the ladder alongside as a
+    baseline, because a few hundred tournament customs cannot support a
+    conditional win rate but can certainly support a timing comparison.
+    """
+    body = {"days": int(days), "min_average_badge": int(min_average_badge),
+            "limit": int(limit), "min_events": int(min_events)}
+    if account_ids:
+        body["account_ids"] = [int(a) for a in account_ids][:200]
+    if match_mode:
+        body["match_mode"] = match_mode
+    if game_mode:
+        body["game_mode"] = game_mode
+    return _post("/matches/objectives", body, token())
+
+
 def status():
     """A line for the sidebar: where we are pointed and what the store holds."""
     if not configured():

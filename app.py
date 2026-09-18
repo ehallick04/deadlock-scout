@@ -738,8 +738,50 @@ if mode == "Drafts":
 if mode == "Meta":
     st.title("Deadlock Meta")
     st.caption("The ladder at large — no roster required.")
-    meta_synergy, meta_picks, meta_heroes, meta_builds = st.tabs(
-        ["Synergy", "Picks & swaps", "Hero win rates", "Item meta"])
+    (meta_synergy, meta_picks, meta_heroes, meta_builds,
+     meta_objectives) = st.tabs(
+        ["Synergy", "Picks & swaps", "Hero win rates", "Item meta",
+         "Objectives"])
+
+    with meta_objectives:
+        st.caption("Which objectives move the needle, conditioned on the game "
+                   "state they fell in. Needs the scouting server — the "
+                   "objective timeline is not in the public API response "
+                   "without asking for it, and the analysis reads the "
+                   "accumulated sample.")
+        try:
+            import objectives_view
+            import server as scout_server
+        except Exception as import_error:
+            st.error(f"Could not load the objectives view: {import_error}")
+        else:
+            if not scout_server.configured():
+                st.info("Point the app at your server to use this — see "
+                        "DEADLOCK_SERVER in the README.")
+            else:
+                o1, o2, o3 = st.columns(3)
+                o_badge = whole_number(
+                    o1.text_input("Min avg badge", value="0", key="ob_badge"),
+                    0, "Badge", minimum=0, maximum=120)
+                o_limit = whole_number(
+                    o2.text_input("Matches to read", value="4000",
+                                  key="ob_limit"),
+                    4000, "Matches", minimum=50, maximum=10000)
+                o_min = whole_number(
+                    o3.text_input("Min even-state cases", value="30",
+                                  key="ob_min"),
+                    30, "Min cases", minimum=1, maximum=10000)
+                if st.button("Read objectives", key="ob_go"):
+                    st.session_state.objectives_go = True
+                if st.session_state.get("objectives_go"):
+                    try:
+                        payload = scout_server.objectives(
+                            min_average_badge=o_badge, limit=o_limit,
+                            min_events=o_min)
+                    except Exception as e:
+                        st.error(f"Could not read objectives: {e}")
+                    else:
+                        objectives_view.render(payload, min_events=o_min)
 
     with meta_synergy:
         render_synergy()
@@ -1262,9 +1304,55 @@ if meta:
 
 # Synergy is ladder-wide and lives in Meta mode, so it is not repeated here
 (tab_hero, tab_player, tab_team, tab_match, tab_comps, tab_items,
- tab_data) = st.tabs(
+ tab_objectives, tab_data) = st.tabs(
     ["By hero", "By player", "By team", "Matches", "Comps", "Build order",
-     "Raw data"])
+     "Objectives", "Raw data"])
+
+# ---- what these players do with objectives, against the ladder
+with tab_objectives:
+    st.caption("How these players handle objectives, next to the ladder. "
+               "Custom games are where a roster's real habits show, so the "
+               "match mode defaults to private lobbies here.")
+    try:
+        import objectives_view
+        import server as scout_server
+    except Exception as import_error:
+        st.error(f"Could not load the objectives view: {import_error}")
+    else:
+        if not scout_server.configured():
+            st.info("Point the app at your server to use this — the objective "
+                    "timeline has to be requested and stored, and that is what "
+                    "the server does.")
+        elif not ids:
+            st.info("Pick a roster or paste some account ids first.")
+        else:
+            p1, p2, p3 = st.columns(3)
+            # a wider window than the ladder default: a roster plays a handful
+            # of customs a week, so 30 days is often a dozen matches
+            p_days_obj = whole_number(
+                p1.text_input("Days", value="180", key="po_days"),
+                180, "Days", minimum=1, maximum=365)
+            p_mode_obj = p2.selectbox(
+                "Match mode", ["private_lobby", "ranked,unranked", "any"],
+                key="po_mode")
+            p_min_obj = whole_number(
+                p3.text_input("Min even-state cases", value="30",
+                              key="po_min"),
+                30, "Min cases", minimum=1, maximum=10000)
+            st.caption(f"{len(ids)} player(s) selected")
+            if st.button("Read objectives", key="po_go"):
+                st.session_state.pro_objectives_go = True
+            if st.session_state.get("pro_objectives_go"):
+                try:
+                    payload = scout_server.objectives(
+                        account_ids=ids, days=p_days_obj,
+                        match_mode=None if p_mode_obj == "any" else p_mode_obj,
+                        min_events=p_min_obj)
+                except Exception as e:
+                    st.error(f"Could not read objectives: {e}")
+                else:
+                    objectives_view.render(payload, min_events=p_min_obj,
+                                           comparison=True)
 
 # ---- pooled hero win rates
 with tab_hero:
