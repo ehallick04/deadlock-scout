@@ -41,6 +41,31 @@ from teams import LEAGUE, PINNED, TEAMS, divisions, roster_many
 
 st.set_page_config(page_title="Deadlock Scout", page_icon="🔒", layout="wide")
 
+# Streamlit renders every DataFrame through pyarrow, and Anaconda's base
+# environment ships a pyarrow built against a different numpy than the one
+# beside it. Left alone, that surfaces far from its cause: the app loads, then
+# the first st.dataframe raises an ImportError from deep inside pyarrow.lib,
+# which reads as a bug here rather than in the interpreter it was launched
+# from. Checking at startup turns a traceback into a sentence. Costs nothing
+# where pyarrow is fine, so it is harmless on Streamlit Cloud.
+try:
+    import pyarrow as _pyarrow  # noqa: F401
+except Exception as _arrow_error:                       # pragma: no cover
+    import sys as _sys
+
+    st.error(
+        "Streamlit cannot load **pyarrow**, so no table on any page will "
+        "render.\n\n"
+        f"`{type(_arrow_error).__name__}: {_arrow_error}`\n\n"
+        "This is almost always Anaconda: its base environment has a pyarrow "
+        "and a numpy built against different versions of each other. Launch "
+        "through this project's own virtualenv instead:\n\n"
+        "```\n./run.sh\n```\n\n"
+        "which is the same as `.venv/bin/python -m streamlit run app.py`."
+    )
+    st.caption(f"Running from: `{_sys.prefix}`")
+    st.stop()
+
 # Before anything renders. The deployed app has a public URL, and once it is
 # pointed at the scouting server its secrets amount to a logged-in session --
 # so the gate is what stops the link itself being access. No-op when no
