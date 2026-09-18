@@ -41,6 +41,14 @@ from teams import LEAGUE, PINNED, TEAMS, divisions, roster_many
 
 st.set_page_config(page_title="Deadlock Scout", page_icon="🔒", layout="wide")
 
+# Before anything renders. The deployed app has a public URL, and once it is
+# pointed at the scouting server its secrets amount to a logged-in session --
+# so the gate is what stops the link itself being access. No-op when no
+# password is configured, which keeps local runs frictionless.
+import gate  # noqa: E402
+
+gate.require_access()
+
 @st.cache_data(ttl=900, show_spinner=False)
 def load(ids_tuple, days, top, match_mode, game_mode, labels_tuple):
     """Cached so re-sorting a table doesn't re-hit the API."""
@@ -687,6 +695,8 @@ st.sidebar.divider()
 # same report reads differently depending on whether it came straight from the
 # API or from the shared store, and "why are these numbers different" is a bad
 # question to have to answer from memory.
+gate.sign_out_button()
+
 try:
     import server as scout_server
     st.sidebar.caption(f"Data: {scout_server.status()}")
