@@ -137,26 +137,49 @@ def whoami():
 # What the last ladder read could actually answer, as opposed to what was asked
 # for. Kept here so the page can say so without threading a return value
 # through every loader.
-last_sample = {"min_badge": None, "count": 0}
+last_sample = {"min_badge": None, "frame_badge": None, "count": 0,
+               "from": "", "to": ""}
 
 
 def sample_note(asked_badge=0):
     """
-    A warning when the store cannot answer the question that was asked.
+    What the sample actually was, when that differs from what was asked.
 
-    A ladder read is served from the deliberate sample, and the sample has its
-    own badge floor. Ask for "any rank" against a Phantom-plus sweep and you get
-    a Phantom-plus answer with nothing in the numbers to say so -- which is the
-    same failure as mixing scouted matches into a ladder baseline, arriving by a
-    different route. -> a string, or None when there is nothing to flag.
+    Two things can differ and both matter. The floor: ask for "any rank" against
+    a Phantom-plus sweep and you get a Phantom-plus answer. And the window: each
+    sweep frame covers however many days its own matches took to fill, so a
+    ladder-wide frame spans far less time than a high-badge one at the same
+    size. -> a string, or None when there is nothing to flag.
     """
     floor = last_sample.get("min_badge")
-    if floor is None or floor <= int(asked_badge or 0):
+    if floor is None:
         return None
-    return (f"These are the {last_sample['count']:,} matches in the shared "
-            f"store, and the lowest average badge in them is {floor} — not the "
-            f"floor you asked for. The sample has only been swept that far "
-            f"down, so read this as that skill band, not as the whole ladder.")
+    asked = int(asked_badge or 0)
+    window = ""
+    if last_sample.get("from") and last_sample.get("to"):
+        window = (f" They run {last_sample['from']} to {last_sample['to']}, "
+                  f"which is the whole window this sample covers.")
+    if floor > asked:
+        return (f"These are the {last_sample['count']:,} matches the shared "
+                f"store holds, and the lowest average badge among them is "
+                f"{floor} — not the floor you asked for. The sweep has only "
+                f"reached that far down, so read this as that skill band "
+                f"rather than the whole ladder.{window}")
+    if window:
+        return None
+    return None
+
+
+def sample_line():
+    """A short description of the sample behind the current numbers."""
+    frame = last_sample.get("frame_badge")
+    if frame is None or not last_sample.get("count"):
+        return None
+    span = ""
+    if last_sample.get("from") and last_sample.get("to"):
+        span = f" · {last_sample['from']} to {last_sample['to']}"
+    return (f"Drawn from the badge {frame}+ sweep: "
+            f"{last_sample['count']:,} matches{span}")
 
 
 def _as_list(value):
@@ -204,8 +227,13 @@ def metadata(**params):
             query["min_unix_timestamp"] = int(params["min_unix_timestamp"])
         got = _post("/matches/ladder?" + urllib.parse.urlencode(query),
                     None, token())
-        last_sample["min_badge"] = got.get("sample_min_badge")
-        last_sample["count"] = len(got.get("matches") or [])
+        last_sample.update({
+            "min_badge": got.get("sample_min_badge"),
+            "frame_badge": got.get("sample_frame_badge"),
+            "count": len(got.get("matches") or []),
+            "from": (got.get("sample_from") or "")[:10],
+            "to": (got.get("sample_to") or "")[:10],
+        })
 
     return [to_upstream(record) for record in got.get("matches", [])]
 

@@ -758,8 +758,11 @@ if mode == "Meta":
                 try:
                     import server as scout_server
                     note = scout_server.sample_note(p_badge)
+                    line = scout_server.sample_line()
                 except Exception:
-                    note = None
+                    note, line = None, None
+                if line:
+                    st.caption(line)
                 if note:
                     st.warning(note)
                 render_picks(ladder, min_games=p_min,
