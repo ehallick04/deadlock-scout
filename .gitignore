@@ -38,3 +38,6 @@ drafts.jsonl.tmp
 *.part
 _to_delete/
 .DS_Store
+
+# credentials for the scouting server -- never committed
+.streamlit/secrets.toml

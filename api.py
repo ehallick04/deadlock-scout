@@ -31,7 +31,21 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import server
+
 BASE = "https://api.deadlock-api.com"
+
+# Match metadata can come from our own server instead of straight from the
+# Deadlock API -- it holds the accumulated store, does the fetching, and
+# enforces who may see what. Only this one family of endpoints is routed;
+# assets, ranks and hero-stats still go direct.
+#
+# Entirely opt-in: with DEADLOCK_SERVER unset nothing below changes behaviour.
+SERVER_PATHS = ("/v1/matches/metadata",)
+
+
+def via_server(path):
+    return server.configured() and any(p in path for p in SERVER_PATHS)
 
 # The API sits behind Cloudflare, which blocks Python's default user agent.
 # Sending a real one is not optional.
@@ -288,7 +302,13 @@ def get_json(path, timeout=30, retries=2, refresh=False, ttl=None, **params):
         if cached is not None:
             return cached
 
-    data = _fetch(url, timeout, retries)
+    # The disk cache still wraps a server-routed call. The server is itself a
+    # cache, but a repeat request inside one report is worth not making at all,
+    # and a finished match never changes either way.
+    if via_server(path):
+        data = server.metadata(**clean)
+    else:
+        data = _fetch(url, timeout, retries)
     _cache_write(url, data)
     return data
 

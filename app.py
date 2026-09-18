@@ -683,6 +683,16 @@ mode = st.sidebar.radio(
          "their custom games. Drafts is the Night Shift pick/ban archive.")
 st.sidebar.divider()
 
+# Which data path is in use. Worth showing rather than leaving implicit: the
+# same report reads differently depending on whether it came straight from the
+# API or from the shared store, and "why are these numbers different" is a bad
+# question to have to answer from memory.
+try:
+    import server as scout_server
+    st.sidebar.caption(f"Data: {scout_server.status()}")
+except Exception as _server_error:      # never let a status line break the app
+    st.sidebar.caption(f"Data: direct (server status unavailable)")
+
 # ---- Drafts: screenshots in, database out. Nothing roster-shaped applies.
 if mode == "Drafts":
     import draft_page
@@ -743,6 +753,15 @@ if mode == "Meta":
                                "first, so older games were left out.")
                 st.caption(f"{len(ladder):,} matches · {p_rank} · last "
                            f"{p_days} days")
+                # When the shared store is answering, say what it can actually
+                # answer: its own sweep floor, not the rank that was selected.
+                try:
+                    import server as scout_server
+                    note = scout_server.sample_note(p_badge)
+                except Exception:
+                    note = None
+                if note:
+                    st.warning(note)
                 render_picks(ladder, min_games=p_min,
                              days=p_days, badge=p_badge)
 
