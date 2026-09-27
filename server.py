@@ -367,7 +367,8 @@ def status():
 def find_players(badge, spread=10, days=14, match_mode="ranked",
                  min_games=10, min_games_per_week=0.0,
                  sort_by="shrunk_win_rate", limit=50, pool_limit=2000,
-                 include_names=True, include_ranks=True):
+                 include_names=True, include_ranks=True,
+                 own_rank_in_band=True, rank_check_limit=600):
     """
     Active players in a badge band, ranked by what the data can support.
 
@@ -393,6 +394,12 @@ def find_players(badge, spread=10, days=14, match_mode="ranked",
         # leaves that column blank.
         "include_names": bool(include_names),
         "include_ranks": bool(include_ranks),
+        # The band matches on each game's average badge, so without this a
+        # player two tiers up qualifies by playing a few games down -- and the
+        # win-rate sort promotes them, because they win the games they play
+        # down. On by default: "at my rank" is what the question means.
+        "own_rank_in_band": bool(own_rank_in_band),
+        "rank_check_limit": int(rank_check_limit),
     }, token())
 
 

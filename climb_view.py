@@ -295,7 +295,7 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
                                          "games a win rate is almost entirely "
                                          "the prior.")
 
-    lower = st.columns([2, 1, 1, 1])
+    lower = st.columns([2, 1, 1, 1, 1])
     sort_label = lower[0].selectbox("Order by", list(SORTS), index=0,
                                     key="climb_sort")
     per_week = lower[1].number_input("Min games/week", min_value=0.0,
@@ -305,7 +305,14 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
                                   key="climb_limit")
     # Both by default: a personaname is not unique and changes at will, so it
     # labels a row while the id is what you copy, paste and look up.
-    how = lower[3].radio("Show as", ("Both", "Persona", "Account ID"), index=0,
+    at_my_rank = lower[3].checkbox(
+        "Only players at this rank", value=True, key="climb_own_rank",
+        help="The band matches on each game's AVERAGE badge, so a player two "
+             "tiers above it qualifies by playing a few games down — and "
+             "ranking by win rate promotes exactly those people, because they "
+             "win ~80% of a lobby they out-rank. Off shows everyone who plays "
+             "in these lobbies, whatever their own rank.")
+    how = lower[4].radio("Show as", ("Both", "Persona", "Account ID"), index=0,
                          key="climb_label",
                          help="Personanames come from Steam and are display "
                               "only — two players can share one. The id is "
@@ -327,7 +334,8 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
                     badge=int(badge), spread=int(spread), days=int(days),
                     min_games=int(min_games),
                     min_games_per_week=float(per_week),
-                    sort_by=SORTS[sort_label], limit=int(limit))
+                    sort_by=SORTS[sort_label], limit=int(limit),
+                    own_rank_in_band=bool(at_my_rank))
             except Exception as error:
                 st.error(f"Scan failed: {error}")
                 st.session_state.pop("climb_found", None)
@@ -351,6 +359,21 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
         f"({found.get('skipped_too_few', 0):,} too few) · "
         f"**ranked games only** · "
         f"{found.get('upstream_calls', 0)} upstream call(s)")
+    if found.get("own_rank_filtered"):
+        above = found.get("skipped_out_of_band", 0)
+        nameless = found.get("skipped_unranked", 0)
+        bits = []
+        if above:
+            bits.append(f"**{above:,}** ranked outside the band")
+        if nameless:
+            bits.append(f"{nameless:,} with no rank on record")
+        st.caption("Filtered to players ranked in this band"
+                   + (" — dropped " + " and ".join(bits) if bits else "")
+                   + f" · {found.get('ranks_checked', 0):,} ranks checked.")
+    else:
+        st.caption("⚠ Showing **everyone who plays in these lobbies**, "
+                   "including players ranked well above the band. Sorting by "
+                   "win rate favours them — they win the games they play down.")
     _reliability(found.get("reliability") or {})
 
     if not rows:
