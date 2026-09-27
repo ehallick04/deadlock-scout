@@ -360,3 +360,47 @@ def status():
     if all(span):
         parts.append(f"{span[0][:10]} to {span[1][:10]}")
     return line + "  ·  store: " + ", ".join(parts)
+
+
+# --------------------------------------------------------------- players
+
+def find_players(badge, spread=10, days=14, match_mode="ranked",
+                 min_games=10, min_games_per_week=0.0,
+                 sort_by="shrunk_win_rate", limit=50, pool_limit=2000):
+    """
+    Active players in a badge band, ranked by what the data can support.
+
+    A band rather than a floor, because a floor includes everything above it and
+    the population thins sharply upwards -- at a middling rank that returns a
+    sample with almost nobody in it twice over.
+
+    The ordering is a shrunk win rate by default, not the observed one. On the
+    accumulated sweep, the top decile by win rate over half a window averaged
+    75.2% there and 51.9% over the other half; the observed rate is very nearly
+    all sampling. `sort_by="win_rate"` is available so the two orders can be
+    compared, which is a more convincing argument than the caveat is.
+    """
+    return _post("/players/find", {
+        "badge": int(badge), "spread": int(spread), "days": int(days),
+        "match_mode": match_mode, "min_games": int(min_games),
+        "min_games_per_week": float(min_games_per_week),
+        "sort_by": sort_by, "limit": int(limit),
+        "pool_limit": int(pool_limit),
+    }, token())
+
+
+def profile_players(account_ids, days=90, match_mode="ranked",
+                    include_history=True):
+    """
+    The drill-down: top heroes, ranked win rate, activity and rank trajectory.
+
+    Capped at 25 accounts server-side -- the history and rank reads are one call
+    each, and this is a proxy for somebody else's free service. `days` defaults
+    longer than the scan's window because a win rate needs the games while the
+    activity numbers are counts.
+    """
+    return _post("/players/profile", {
+        "account_ids": [int(a) for a in account_ids][:25],
+        "days": int(days), "match_mode": match_mode,
+        "include_history": bool(include_history),
+    }, token())
