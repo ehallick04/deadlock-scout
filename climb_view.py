@@ -25,6 +25,10 @@ SORTS = {
     "Rising fastest (needs a look-closer first)": "rank_progress",
 }
 
+# Deadlock's own region names. Kept in step with players.REGIONS on the server,
+# which is where the country -> region mapping lives.
+REGIONS = ("N. America", "Europe", "Russia", "Asia", "S. America", "Oceania")
+
 PREAMBLE = """
 **Sorting a rank by win rate does not work, and this page is built around that.**
 
@@ -148,6 +152,11 @@ def _candidates_frame(rows: list, how="Both", badge_label=None) -> pd.DataFrame:
         # the band filters on the *match* average badge, so a candidate found in
         # it need not be ranked in it.
         "rank": _rank(row, badge_label),
+        # "likely" is doing real work in this header. It is inferred from the
+        # country the player typed into Steam, not from the server they queued
+        # on -- region is not on any finished match, so this is all there is.
+        "likely region": row.get("region") or "—",
+        "country": row.get("country") or "—",
         "ranked games": row["games"],
         "per week": round(row["games_per_week"], 1),
         # The shrunk estimate first, because it is what the order means.
@@ -295,7 +304,7 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
                                          "games a win rate is almost entirely "
                                          "the prior.")
 
-    lower = st.columns([2, 1, 1, 1, 1])
+    lower = st.columns([2, 1, 1, 1.4, 1, 1])
     sort_label = lower[0].selectbox("Order by", list(SORTS), index=0,
                                     key="climb_sort")
     per_week = lower[1].number_input("Min games/week", min_value=0.0,
@@ -305,14 +314,20 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
                                   key="climb_limit")
     # Both by default: a personaname is not unique and changes at will, so it
     # labels a row while the id is what you copy, paste and look up.
-    at_my_rank = lower[3].checkbox(
+    picked_regions = lower[3].multiselect(
+        "Likely region", REGIONS, default=[], key="climb_regions",
+        help="INFERRED from the country on their Steam profile — not the "
+             "server they queue on, which the API does not expose for finished "
+             "matches. About a third of accounts declare no country and are "
+             "dropped when you filter. Leave empty for everyone.")
+    at_my_rank = lower[4].checkbox(
         "Only players at this rank", value=True, key="climb_own_rank",
         help="The band matches on each game's AVERAGE badge, so a player two "
              "tiers above it qualifies by playing a few games down — and "
              "ranking by win rate promotes exactly those people, because they "
              "win ~80% of a lobby they out-rank. Off shows everyone who plays "
              "in these lobbies, whatever their own rank.")
-    how = lower[4].radio("Show as", ("Both", "Persona", "Account ID"), index=0,
+    how = lower[5].radio("Show as", ("Both", "Persona", "Account ID"), index=0,
                          key="climb_label",
                          help="Personanames come from Steam and are display "
                               "only — two players can share one. The id is "
@@ -335,7 +350,8 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
                     min_games=int(min_games),
                     min_games_per_week=float(per_week),
                     sort_by=SORTS[sort_label], limit=int(limit),
-                    own_rank_in_band=bool(at_my_rank))
+                    own_rank_in_band=bool(at_my_rank),
+                    regions=list(picked_regions) or None)
             except Exception as error:
                 st.error(f"Scan failed: {error}")
                 st.session_state.pop("climb_found", None)
@@ -374,6 +390,13 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
         st.caption("⚠ Showing **everyone who plays in these lobbies**, "
                    "including players ranked well above the band. Sorting by "
                    "win rate favours them — they win the games they play down.")
+    if found.get("region_filtered"):
+        st.caption(
+            f"Region filter **{', '.join(found['region_filtered'])}** — "
+            f"dropped {found.get('skipped_region', 0):,} in other regions and "
+            f"{found.get('skipped_no_country', 0):,} who declare no country. "
+            f"This is inferred from their Steam profile, not from the server "
+            f"they played on.")
     _reliability(found.get("reliability") or {})
 
     if not rows:

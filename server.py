@@ -368,7 +368,8 @@ def find_players(badge, spread=10, days=14, match_mode="ranked",
                  min_games=10, min_games_per_week=0.0,
                  sort_by="shrunk_win_rate", limit=50, pool_limit=2000,
                  include_names=True, include_ranks=True,
-                 own_rank_in_band=True, rank_check_limit=600):
+                 own_rank_in_band=True, rank_check_limit=600,
+                 regions=None):
     """
     Active players in a badge band, ranked by what the data can support.
 
@@ -400,6 +401,10 @@ def find_players(badge, spread=10, days=14, match_mode="ranked",
         # down. On by default: "at my rank" is what the question means.
         "own_rank_in_band": bool(own_rank_in_band),
         "rank_check_limit": int(rank_check_limit),
+        # Inferred from the Steam profile's declared country -- region is not a
+        # field on any finished match, so it is the only thing available, and it
+        # is where the player says they live rather than where they queue.
+        "regions": list(regions) if regions else None,
     }, token())
 
 
