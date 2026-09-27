@@ -85,6 +85,28 @@ def _label(row, how, badge_label=None):
     return f"{persona} ({account})"
 
 
+# Subranks run 1-6, so a badge (tier * 10 + subrank) is not a number you can add
+# to: 76 is Emissary 6 and the next rank up is 81. This mirrors
+# players.rank_band on the server, which stays authoritative -- it is duplicated
+# here only so the slider can show its own range before a scan runs, and the
+# caption *after* a scan uses the range the server actually used. If the two ever
+# disagree, believe the server.
+_SUBRANKS = 6
+_TOP_RUNG = 12 * _SUBRANKS - 1
+
+
+def _preview_band(badge, spread):
+    """(low badge, high badge) for the slider's caption. -> a real rank each end."""
+    tier, sub = divmod(int(badge), 10)
+    here = min(max(tier, 0), 11) * _SUBRANKS + min(max(sub or 1, 1), _SUBRANKS) - 1
+    ends = []
+    for rung in (here - int(spread), here + int(spread)):
+        rung = min(max(rung, 0), _TOP_RUNG)
+        step, index = divmod(rung, _SUBRANKS)
+        ends.append(step * 10 + index + 1)
+    return ends[0], ends[1]
+
+
 def _rank(row, badge_label=None):
     """Their own badge, in the app's usual wording. Blank means unranked."""
     badge = row.get("badge")
@@ -240,10 +262,13 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
         badge = top[0].number_input("Your badge (tier × 10 + subrank)",
                                     min_value=0, max_value=120, value=91,
                                     key="climb_badge")
-    spread = top[1].slider("Band", 0, 40, 10, key="climb_spread",
-                           help="Badge points either side. 10 is one full tier "
-                                "each way — wide enough to find people, narrow "
-                                "enough that they are in lobbies like yours.")
+    # Counted in subranks, not badge points. Subranks run 1-6, so the badge
+    # encoding has gaps (76 is Emissary 6, the next rank up is 81) and adding to
+    # the number lands between the rungs -- which it used to do.
+    spread = top[1].slider("Band (± subranks)", 0, 18, 3, key="climb_spread",
+                           help="Subranks either side, walked along the ladder. "
+                                "6 is one full tier each way. Emissary 4 with a "
+                                "spread of 3 means Emissary 1 to Oracle 1.")
     days = top[2].number_input("Days", min_value=1, max_value=365, value=14,
                                key="climb_days")
     min_games = top[3].number_input("Min games", min_value=1, max_value=500,
@@ -268,6 +293,15 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
                               "only — two players can share one. The id is "
                               "what identifies an account.")
 
+    if badge_label:
+        try:
+            low_pre, high_pre = _preview_band(badge, spread)
+            st.caption(f"Scanning **{badge_label(low_pre)}** to "
+                       f"**{badge_label(high_pre)}** — lobbies whose "
+                       f"*average* badge falls in that range.")
+        except Exception:
+            pass
+
     if st.button("Scan", type="primary", key="climb_scan"):
         with st.spinner("Reading the band…"):
             try:
@@ -285,15 +319,15 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
         return
 
     rows = found.get("candidates") or []
-    band = ""
+    band = f"badge {found.get('badge_low')}–{found.get('badge_high')}"
     if badge_label:
         try:
-            band = (f" ({badge_label(found['badge_low'])} – "
-                    f"{badge_label(found['badge_high'])})")
+            band = (f"{badge_label(found['badge_low'])} – "
+                    f"{badge_label(found['badge_high'])}")
         except Exception:
-            band = ""
+            pass
     st.caption(
-        f"Badge {found.get('badge_low')}–{found.get('badge_high')}{band} · "
+        f"{band} · "
         f"{found.get('pool_size', 0):,} accounts in the band, "
         f"{found.get('eligible', 0):,} with enough games "
         f"({found.get('skipped_too_few', 0):,} too few) · "
