@@ -108,9 +108,15 @@ def _preview_band(badge, spread):
 
 
 def _rank(row, badge_label=None):
-    """Their own badge, in the app's usual wording. Blank means unranked."""
+    """
+    Their own badge, in the app's usual wording.
+
+    Blank means no rank on record -- unranked, or still in placement games. Zero
+    counts as blank: it is the unranked sentinel, and badge_label would render it
+    as "Obscurus", which is a rank the player has not been given.
+    """
     badge = row.get("badge")
-    if badge is None:
+    if not badge:
         return "—"
     if badge_label:
         try:
@@ -142,7 +148,7 @@ def _candidates_frame(rows: list, how="Both", badge_label=None) -> pd.DataFrame:
         # the band filters on the *match* average badge, so a candidate found in
         # it need not be ranked in it.
         "rank": _rank(row, badge_label),
-        "games": row["games"],
+        "ranked games": row["games"],
         "per week": round(row["games_per_week"], 1),
         # The shrunk estimate first, because it is what the order means.
         "best estimate": _pct(row["shrunk_win_rate"]),
@@ -189,12 +195,24 @@ def _profile_card(entry: dict, hero_names: dict, how="Both",
                       help="From the game's own ranked_delta. A subrank spans "
                            "1000 points, so +50 a game is a subrank every "
                            "20 games.")
-        right.metric("Games / week",
+        seen = track.get("history_rows") or 0
+        dropped = track.get("excluded_unranked") or 0
+        right.metric("Ranked games / week",
                      f"{steady.get('games_per_week', 0):.1f}",
                      help=f"Active on {steady.get('active_days', 0)} days; "
                           f"longest gap "
-                          f"{steady.get('longest_gap_days', 0):.1f} days.")
+                          f"{steady.get('longest_gap_days', 0):.1f} days."
+                          + (f" {dropped} of {seen} matches in their history "
+                             f"were not ranked and are excluded." if seen else ""))
 
+        if dropped:
+            # The only thing on screen that would reveal the ranked filter
+            # having stopped filtering. A count of unranked games looks exactly
+            # like a count of ranked ones.
+            st.caption(f"{entry['games']} ranked games counted, from the "
+                       f"{entry.get('games_source', 'hero table')} — "
+                       f"{dropped} unranked match(es) in their recent history "
+                       f"left out.")
         if track.get("badge_change") is not None:
             direction = "up" if track["badge_change"] > 0 else "down"
             st.caption(f"Badge went from {track['badge_first']} to "
@@ -331,6 +349,7 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
         f"{found.get('pool_size', 0):,} accounts in the band, "
         f"{found.get('eligible', 0):,} with enough games "
         f"({found.get('skipped_too_few', 0):,} too few) · "
+        f"**ranked games only** · "
         f"{found.get('upstream_calls', 0)} upstream call(s)")
     _reliability(found.get("reliability") or {})
 
