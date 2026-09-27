@@ -366,7 +366,8 @@ def status():
 
 def find_players(badge, spread=10, days=14, match_mode="ranked",
                  min_games=10, min_games_per_week=0.0,
-                 sort_by="shrunk_win_rate", limit=50, pool_limit=2000):
+                 sort_by="shrunk_win_rate", limit=50, pool_limit=2000,
+                 include_names=True, include_ranks=True):
     """
     Active players in a badge band, ranked by what the data can support.
 
@@ -386,11 +387,17 @@ def find_players(badge, spread=10, days=14, match_mode="ranked",
         "min_games_per_week": float(min_games_per_week),
         "sort_by": sort_by, "limit": int(limit),
         "pool_limit": int(pool_limit),
+        # Personanames and each candidate's own badge. One extra call each, made
+        # only for the rows that survive the gates, and neither can fail the
+        # scan -- a lookup that breaks reports itself in `label_problems` and
+        # leaves that column blank.
+        "include_names": bool(include_names),
+        "include_ranks": bool(include_ranks),
     }, token())
 
 
 def profile_players(account_ids, days=90, match_mode="ranked",
-                    include_history=True):
+                    include_history=True, include_names=True):
     """
     The drill-down: top heroes, ranked win rate, activity and rank trajectory.
 
@@ -403,4 +410,5 @@ def profile_players(account_ids, days=90, match_mode="ranked",
         "account_ids": [int(a) for a in account_ids][:25],
         "days": int(days), "match_mode": match_mode,
         "include_history": bool(include_history),
+        "include_names": bool(include_names),
     }, token())

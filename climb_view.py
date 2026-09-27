@@ -52,6 +52,52 @@ def _pct(value):
     return "—" if value is None else f"{100 * value:.1f}%"
 
 
+# Personanames are arbitrary player-controlled text arriving from a third party,
+# and Streamlit renders markdown in captions, expander labels and metric help.
+# A name of "**x**" would render bold, and "[click](http://...)" would render a
+# link somebody else chose -- so every name is escaped before it reaches any of
+# those. Dataframe cells are not markdown and need no escaping, but they get it
+# anyway rather than depending on which widget a value ends up in.
+_MARKDOWN = "\\`*_{}[]()#+-.!|<>$~"
+
+
+def _safe(text):
+    if not text:
+        return ""
+    out = "".join("\\" + c if c in _MARKDOWN else c for c in str(text))
+    return out.replace("\n", " ").replace("\r", " ")
+
+
+def _label(row, how, badge_label=None):
+    """
+    How to print one account, given the display toggle.
+
+    The id is never thrown away. Personanames are not unique -- two candidates
+    can share one -- and they change whenever the player feels like it, so a name
+    labels a row and an id identifies it. "Both" is the default for that reason.
+    """
+    account = row.get("account_id")
+    persona = row.get("persona")
+    if how == "Account ID" or not persona:
+        return str(account)
+    if how == "Persona":
+        return persona
+    return f"{persona} ({account})"
+
+
+def _rank(row, badge_label=None):
+    """Their own badge, in the app's usual wording. Blank means unranked."""
+    badge = row.get("badge")
+    if badge is None:
+        return "—"
+    if badge_label:
+        try:
+            return badge_label(badge)
+        except Exception:
+            pass
+    return str(badge)
+
+
 def _reliability(note: dict) -> None:
     """The caveat, as a number rather than a hedge."""
     if not note:
@@ -67,9 +113,13 @@ def _reliability(note: dict) -> None:
     )
 
 
-def _candidates_frame(rows: list) -> pd.DataFrame:
+def _candidates_frame(rows: list, how="Both", badge_label=None) -> pd.DataFrame:
     return pd.DataFrame([{
-        "account": row["account_id"],
+        "player": _label(row, how),
+        # Their own rank, which is a different question from the band scanned:
+        # the band filters on the *match* average badge, so a candidate found in
+        # it need not be ranked in it.
+        "rank": _rank(row, badge_label),
         "games": row["games"],
         "per week": round(row["games_per_week"], 1),
         # The shrunk estimate first, because it is what the order means.
@@ -92,15 +142,16 @@ def _hero_frame(rows: list, hero_names: dict) -> pd.DataFrame:
     } for row in rows])
 
 
-def _profile_card(entry: dict, hero_names: dict) -> None:
+def _profile_card(entry: dict, hero_names: dict, how="Both",
+                  badge_label=None) -> None:
     track = entry.get("trajectory") or {}
     steady = entry.get("consistency") or {}
     rank = entry.get("rank") or {}
 
-    badge = rank.get("badge")
-    header = f"Account {entry['account_id']}"
+    header = _safe(_label(entry, how))
+    badge = entry.get("badge") or rank.get("badge")
     if badge:
-        header += f" · badge {badge}"
+        header += f" · {_rank({'badge': badge}, badge_label)}"
     header += f" · {entry['games']} ranked games"
 
     with st.expander(header):
@@ -201,7 +252,7 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
                                          "games a win rate is almost entirely "
                                          "the prior.")
 
-    lower = st.columns([2, 1, 1])
+    lower = st.columns([2, 1, 1, 1])
     sort_label = lower[0].selectbox("Order by", list(SORTS), index=0,
                                     key="climb_sort")
     per_week = lower[1].number_input("Min games/week", min_value=0.0,
@@ -209,6 +260,13 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
                                      key="climb_per_week")
     limit = lower[2].number_input("Show", min_value=5, max_value=200, value=50,
                                   key="climb_limit")
+    # Both by default: a personaname is not unique and changes at will, so it
+    # labels a row while the id is what you copy, paste and look up.
+    how = lower[3].radio("Show as", ("Both", "Persona", "Account ID"), index=0,
+                         key="climb_label",
+                         help="Personanames come from Steam and are display "
+                              "only — two players can share one. The id is "
+                              "what identifies an account.")
 
     if st.button("Scan", type="primary", key="climb_scan"):
         with st.spinner("Reading the band…"):
@@ -247,7 +305,17 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
                    "lengthen the window, or drop the minimum games.")
         return
 
-    st.dataframe(_candidates_frame(rows), hide_index=True, width="stretch")
+    if found.get("label_problems"):
+        # A label lookup failing must not look like a broken scan.
+        for problem in found["label_problems"]:
+            st.caption(f"⚠ {_safe(problem)} — that column is blank; "
+                       f"the scan itself is unaffected.")
+    st.dataframe(_candidates_frame(rows, how, badge_label),
+                 hide_index=True, width="stretch")
+    unranked = sum(1 for row in rows if row.get("badge") is None)
+    if unranked:
+        st.caption(f"{unranked} of {len(rows)} have no ranked badge on record — "
+                   f"they play in these lobbies without a rank of their own.")
 
     # ---------------------------------------------------------- the drill-down
     st.subheader("2. Look closer")
@@ -255,9 +323,14 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
                "hero pool, the ranked win rate over a longer period and the "
                "rank trajectory come from.")
 
+    # The options stay account ids -- they are what the profile call takes -- and
+    # format_func does the labelling, so switching the toggle cannot change which
+    # accounts are selected.
     ids = [row["account_id"] for row in rows]
+    shown = {row["account_id"]: _label(row, how) for row in rows}
     picks = st.multiselect("Accounts", ids, default=ids[:5],
-                           max_selections=25, key="climb_picks")
+                           max_selections=25, key="climb_picks",
+                           format_func=lambda a: shown.get(a, str(a)))
     closer = st.columns([1, 1, 2])
     long_days = closer[0].number_input(
         "Days of history", min_value=7, max_value=365, value=90,
@@ -296,7 +369,9 @@ def render(rank_choices=None, hero_names=None, badge_label=None) -> None:
     for entry in sorted(got.get("profiles") or [],
                         key=lambda p: -((p.get("trajectory") or {})
                                         .get("progress_per_game") or 0)):
-        _profile_card(entry, hero_names)
+        _profile_card(entry, hero_names, how, badge_label)
 
+    for problem in got.get("label_problems") or []:
+        st.caption(f"⚠ {_safe(problem)}")
     for missing in got.get("unavailable") or []:
-        st.caption(f"Account {missing['account_id']}: {missing['reason']}")
+        st.caption(f"Account {missing['account_id']}: {_safe(missing['reason'])}")
