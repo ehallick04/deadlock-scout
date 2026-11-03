@@ -218,3 +218,47 @@ def test_an_empty_harvested_page_keeps_the_previous_roster(tmp_path):
     assert br.carry_over_empty(data, html, previous) == ["Gone Quiet"]
     assert data["teams"]["Gone Quiet"]["stale_since"] == "2026-08-31"
     assert data["teams"]["Gone Quiet"]["players"] == {"b": 6}
+
+
+DIRECTORY = """
+<section class="directory-division" aria-labelledby="division-Div 3">
+<a class="team-card" href="/teams/2/"><span class="team-card__name">Here</span></a>
+<a class="team-card team-card--disbanded" href="/teams/1/">
+  <span class="team-card__name">Gone Quiet</span>
+  <span class="tag tag--disbanded">Disbanded</span></a>
+</section>
+"""
+
+
+def test_the_directory_parser_reads_the_disbanded_flag():
+    from roster_import import parse_dse_directory
+
+    flags = {t["team"]: t["disbanded"] for t in parse_dse_directory(DIRECTORY)}
+    assert flags == {"Here": False, "Gone Quiet": True}
+
+
+def test_a_disbanded_teams_empty_page_is_dropped_not_carried_over(tmp_path):
+    """A disbanded team's page lists no players, which looks exactly like a
+    failed fetch. With the directory given, it goes rather than being kept
+    with its old roster."""
+    import build_rosters as br
+
+    (tmp_path / "dir.html").write_text(DIRECTORY)
+    html = ("<!-- DSE-TEAM | 1 | Gone Quiet | Div 3 -->\n"
+            "<!-- DSE-TEAM | 2 | Here | Div 3 -->\n")
+    data = {"teams": {"Here": {"team_id": 2, "players": {"a": 5}}}}
+    previous = {"generated": "2026-08-31",
+                "teams": {"Gone Quiet": {"team_id": 1, "players": {"b": 6}}}}
+    br.carry_over_empty(data, html, previous)
+    removed = br.drop_disbanded(data, br.disbanded_in(tmp_path / "dir.html"))
+    assert removed == ["Gone Quiet"]
+    assert list(data["teams"]) == ["Here"]
+
+
+def test_disbanded_teams_are_matched_by_id_not_name():
+    import build_rosters as br
+
+    data = {"teams": {"Renamed Since": {"team_id": 7, "players": {}},
+                      "Same Name": {"team_id": 8, "players": {}}}}
+    assert br.drop_disbanded(data, {7}) == ["Renamed Since"]
+    assert list(data["teams"]) == ["Same Name"]

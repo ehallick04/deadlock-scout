@@ -13,7 +13,7 @@ Because this repo is public, nothing secret may land in it — see Secrets.
 ./run.sh                 # streamlit run app.py, via .venv
 ./run.sh --server.port 8502
 .venv/bin/python -m pytest -q tests     # pytest is dev-only, not in requirements.txt
-.venv/bin/python build_rosters.py ~/Downloads/dse_rosters.html   # refresh rosters.json
+.venv/bin/python build_rosters.py ~/Downloads/dse_rosters.html --directory ~/Downloads/teams.html   # refresh rosters.json; the saved Teams directory page drops disbanded teams
 ```
 
 **Always use `run.sh`.** A bare `streamlit run` picks up the Anaconda base
