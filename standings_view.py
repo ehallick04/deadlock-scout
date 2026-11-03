@@ -20,6 +20,12 @@ def _badges(ids_tuple):
     return team_ranks.fetch_badges(list(ids_tuple))
 
 
+# label -> (include_subs, top_n)
+COUNTED = {"Core + POC": (False, None),
+           "Whole roster": (True, None),
+           "Top 6 by rank": (False, 6)}
+
+
 def render(badge_label) -> None:
     st.title("League standings")
     if not LEAGUE:
@@ -35,9 +41,14 @@ def render(badge_label) -> None:
     left, middle, right = st.columns([2, 1, 1])
     scope = left.selectbox("Show", ["Whole league"] + divisions(),
                            key="st_scope")
-    include_subs = middle.checkbox("Count subs", value=False, key="st_subs",
-                                   help="Off: core players and the point of "
-                                        "contact, the team that plays.")
+    counted = middle.radio(
+        "Players counted", list(COUNTED), key="st_counted",
+        help="Core + POC: the listed starting team. Whole roster: subs too. "
+             "Top 6 by rank: the six highest-ranked players on the roster, subs "
+             "included -- the strongest lineup the team could field. Top 6 "
+             "favours deep rosters a little, since a nine-player team picks "
+             "from nine.")
+    include_subs, top_n = COUNTED[counted]
     min_ranked = right.number_input("Min ranked players", 1, 9,
                                     team_ranks.MIN_RANKED, key="st_min",
                                     help="Fewer than this and the team is "
@@ -52,7 +63,8 @@ def render(badge_label) -> None:
 
     rows = team_ranks.standings(
         division=None if scope == "Whole league" else scope,
-        include_subs=include_subs, min_ranked=int(min_ranked), badges=badges)
+        include_subs=include_subs, min_ranked=int(min_ranked), badges=badges,
+        top_n=top_n)
 
     table = pd.DataFrame([{
         "Division place": r["division_place"],

@@ -79,6 +79,28 @@ def test_subs_are_left_out_unless_asked_for():
     assert with_subs["players"] == 3 and with_subs["mean_badge"] < 111
 
 
+def test_top_six_takes_the_highest_ranked_players_subs_included():
+    team = dict(c1=(1, 101, "Core"), c2=(2, 101, "Core"), c3=(3, 61, "Core"),
+                c4=(4, 101, "POC"), c5=(5, 101, "Core"), c6=(6, 101, "Core"),
+                s1=(7, 111, "Sub"), s2=(8, 81, "Sub"))
+    teams = {"T": _team("D", **team)}
+    row = tr.team_strength("T", _badges(team), teams=teams, top_n=6)
+    # the Eternus sub is in, the Ritualist core and the Oracle sub are out
+    assert (row["ranked"], row["players"], row["low_badge"], row["top_badge"]) == (
+        6, 6, 101, 111)
+    starters = tr.team_strength("T", _badges(team), teams=teams)
+    assert starters["low_badge"] == 61
+
+
+def test_top_six_never_picks_an_unranked_player():
+    team = dict(p1=(1, 111, "Core"), p2=(2, 111, "Core"), p3=(3, 111, "Core"),
+                p4=(4, 111, "Core"), u1=(5, None, "Core"), u2=(6, None, "Sub"),
+                u3=(7, None, "Sub"))
+    row = tr.team_strength("T", _badges(team), teams={"T": _team("D", **team)},
+                           top_n=6)
+    assert (row["ranked"], row["unranked"], row["mean_badge"]) == (4, 2, 111)
+
+
 def test_a_thin_team_is_listed_but_not_placed():
     """One Eternus and five unranked accounts is not the best team."""
     thin = dict(p1=(1, 116, "Core"), **{f"u{i}": (10 + i, None, "Core")

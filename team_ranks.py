@@ -31,7 +31,10 @@ on fewer than `min_ranked` players is listed but not placed: one Eternus and
 five unranked accounts is not the best team in the league.
 
 Subs are left out by default: the question is how strong the team that plays
-is. Pass include_subs=True to count the whole roster.
+is. Pass include_subs=True to count the whole roster, or top_n=6 for the best
+six ranked players on it, subs included -- the strongest lineup the team could
+field. Top-n favours deep rosters a little: a nine-player team picks its six
+from nine.
 
 Ranks come from the bulk `/v1/players/rank`, 1,000 accounts a call, so the
 whole league is two calls. In that response `rank` is the *tier* and `badge` is
@@ -95,7 +98,7 @@ def _counted(team, include_subs):
             if include_subs or roles.get(label, "Core") in PLAYING_ROLES]
 
 
-def team_strength(name, badges, include_subs=False, teams=None):
+def team_strength(name, badges, include_subs=False, teams=None, top_n=None):
     """
     One team's rank, averaged on the ladder.
     -> {'team','division','players','ranked','unranked','mean_rung',
@@ -106,8 +109,16 @@ def team_strength(name, badges, include_subs=False, teams=None):
     if teams is None:
         from teams import TEAMS as teams
     team = teams[name]
-    counted = _counted(team, include_subs)
+    counted = _counted(team, include_subs or top_n is not None)
     have = [badges[a] for a in counted if badges.get(a)]
+    if top_n is not None:
+        # The best n ranked players, whatever their role. Unranked players can
+        # never be among them, so a team with fewer than n ranked averages
+        # what it has, and min_ranked decides whether that is enough.
+        # `counted` only sizes the "ranked of" column from here: n seats, or
+        # the whole roster if it is smaller.
+        have = sorted(have, key=position, reverse=True)[:top_n]
+        counted = counted[:top_n]
     rungs = [position(b) for b in have]
     mean_rung = sum(rungs) / len(rungs) if rungs else None
     return {
@@ -137,7 +148,7 @@ def _place(rows, key):
 
 
 def standings(division=None, include_subs=False, min_ranked=MIN_RANKED,
-              badges=None, teams=None, refresh=False):
+              badges=None, teams=None, refresh=False, top_n=None):
     """
     Every team's average rank, placed across the league and within its
     division. Teams with fewer than `min_ranked` ranked players are returned
@@ -154,7 +165,8 @@ def standings(division=None, include_subs=False, min_ranked=MIN_RANKED,
         everyone = [a for t in teams.values() for a in t["players"].values()]
         badges = fetch_badges(everyone, refresh=refresh)
 
-    rows = [team_strength(name, badges, include_subs, teams) for name in teams]
+    rows = [team_strength(name, badges, include_subs, teams, top_n)
+            for name in teams]
     placed = sorted((r for r in rows if r["ranked"] >= min_ranked),
                     key=lambda r: (-r["mean_rung"], r["team"].lower()))
     thin = sorted((r for r in rows if r["ranked"] < min_ranked),
