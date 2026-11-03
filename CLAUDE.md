@@ -12,6 +12,8 @@ Because this repo is public, nothing secret may land in it — see Secrets.
 ```bash
 ./run.sh                 # streamlit run app.py, via .venv
 ./run.sh --server.port 8502
+.venv/bin/python -m pytest -q tests     # pytest is dev-only, not in requirements.txt
+.venv/bin/python build_rosters.py ~/Downloads/dse_rosters.html   # refresh rosters.json
 ```
 
 **Always use `run.sh`.** A bare `streamlit run` picks up the Anaconda base
@@ -21,7 +23,8 @@ traceback into a sentence.
 
 ## Shape
 
-- `app.py` — the UI. Modes: **Meta · Players · Pros · Drafts · Climb**. Meta, Drafts and Climb short-circuit the roster sidebar; the rest share it.
+- `app.py` — the UI. Modes: **Meta · Players · Pros · Drafts · Climb · Standings**. Meta, Drafts, Climb and Standings short-circuit the roster sidebar; the rest share it.
+- `team_ranks.py`, `standings_view.py` — league teams ranked by their players' average rank, averaged on ladder rungs (never raw badges) with unranked players excluded and thin teams unplaced. Ranks come from the bulk `/v1/players/rank`, where `rank` is the **tier** and `badge` the badge.
 - `deadlock.py` — the domain layer and most API parsing. Months of empirically-derived field aliases live in its key tuples; prefer extending them to adding a parser.
 - `api.py` — HTTP plus the disk cache, and the routing seam to the server.
 - `server.py` — the client half of the server integration. **Entirely opt-in**: with `DEADLOCK_SERVER` unset, `configured()` is False, `api.py` never calls in, and the app behaves exactly as it did before the server existed. Keep that property.
@@ -75,7 +78,8 @@ making the database authoritative is a downgrade.
 This repo is **public**.
 
 - `.streamlit/secrets.toml` is gitignored and holds `DEADLOCK_SERVER`, the server login and the gate keys. Never commit it, never `export` the password (shell history, `ps`), never paste one into chat.
-- `rosters.json` — ~1,080 league players' account IDs — **is** committed, which was defensible when the tool was one person's and is not as the backing store for a multi-team service. Moving it server-side is an open item; do not add to it.
+- `build_rosters.py` keeps the previous roster for any team whose harvested page came back empty, marked `stale_since`; a failed fetch otherwise looks exactly like a team leaving the league.
+- `rosters.json` — ~1,290 league players' account IDs — **is** committed, which was defensible when the tool was one person's and is not as the backing store for a multi-team service. Moving it server-side is an open item; do not add to it.
 - Probe dumps carry real account IDs and are gitignored.
 
 ## Gotchas

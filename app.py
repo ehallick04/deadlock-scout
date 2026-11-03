@@ -709,13 +709,15 @@ def load_meta_buy_order(days, hero_id, min_matches):
 #   Pros     the pinned teams, custom games only
 #   Drafts   tournament pick/ban screenshots, read and checked by hand
 #   Climb    who to queue with at your own rank -- no roster either
-MODES = ("Meta", "Players", "Pros", "Drafts", "Climb")
+#   Standings  the league's teams ranked by their players' average rank
+MODES = ("Meta", "Players", "Pros", "Drafts", "Climb", "Standings")
 mode = st.sidebar.radio(
     "Looking at", MODES, index=1,
     help="Meta reads the whole ladder and needs nothing selected. "
          "Players scouts whoever you pick. Pros is the pinned rosters in "
          "their custom games. Drafts is the Night Shift pick/ban archive. "
-         "Climb finds people at your rank worth queueing with.")
+         "Climb finds people at your rank worth queueing with. "
+         "Standings ranks the league's teams by average player rank.")
 st.sidebar.divider()
 
 # Which data path is in use. Worth showing rather than leaving implicit: the
@@ -742,6 +744,12 @@ if mode == "Climb":
     climb_view.render(rank_choices=load_rank_choices(),
                       hero_names=load_all_hero_names(),
                       badge_label=badge_label)
+    st.stop()
+
+# ---- Standings: the whole league at once, so no roster selection either
+if mode == "Standings":
+    import standings_view
+    standings_view.render(badge_label=badge_label)
     st.stop()
 
 # ---- Meta: ladder-wide, so it short-circuits everything roster-shaped
