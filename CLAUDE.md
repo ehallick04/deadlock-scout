@@ -23,7 +23,8 @@ traceback into a sentence.
 
 ## Shape
 
-- `app.py` — the UI. Modes: **Meta · Players · Pros · Drafts · Climb · Standings**. Meta, Drafts, Climb and Standings short-circuit the roster sidebar; the rest share it.
+- `app.py` — the UI. Modes: **Meta · Players · Pros · Drafts · Climb · Standings · Theorycraft**. Meta, Drafts, Climb, Standings and Theorycraft short-circuit the roster sidebar; the rest share it.
+- `theorycraft/`, `theorycraft_view.py` — damage-over-time simulator for builds (boons, buy order, AP order, spirit/weapon scaling). Reads the local `heroes.json` / `items.json`, never the network; `theorycraft.refresh_catalog()` after a patch. `optimize.recommend()` searches buy orders (sustain floor / weighted / frontier; lane items locked / from enemy laners / auto). Item procs and shred come from `theorycraft/item_effects.json` (researched; each effect has an uptime and confidence). Souls curves are measured per hero and rank band into `souls_curves.json` by `theorycraft/measure_souls.py` from the server DB. What is modelled vs approximated is in `theorycraft/MECHANICS.md`.
 - `team_ranks.py`, `standings_view.py` — league teams ranked by their players' average rank, averaged on ladder rungs (never raw badges) with unranked players excluded and thin teams unplaced. Ranks come from the bulk `/v1/players/rank`, where `rank` is the **tier** and `badge` the badge.
 - `deadlock.py` — the domain layer and most API parsing. Months of empirically-derived field aliases live in its key tuples; prefer extending them to adding a parser.
 - `api.py` — HTTP plus the disk cache, and the routing seam to the server.
