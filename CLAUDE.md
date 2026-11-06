@@ -38,6 +38,28 @@ hero-stats still go direct, so the Hero win rates tab is unaffected. The
 objectives and players endpoints are server-only analyses and call `server.py`
 directly.
 
+## Theorycraft: how to work on it
+
+- **Wiki first, never guess a mechanic.** Every hero has a page at `https://deadlock.wiki/<Hero_Name>` (spaces as underscores). Fetch it with `?action=render` for text, or `?action=raw` for wikitext, which carries the notes and update log. If the data and the wiki leave a mechanic unclear, ask the user for the relevant wiki page rather than assuming.
+- **Data beats wiki on numbers; wiki beats guesses on semantics.** The wiki is sometimes stale (its Boon page's detail tables are 200 souls off). The tooltip-generating Lua is readable at `Module:Abilities/card`.
+- **Validate against wiki tables before trusting a change.** `tests/test_theorycraft.py` pins:
+  - the Hero_Comparison_Table base DPS and sustained DPS for all 44 heroes;
+  - every hero's boon stats;
+  - Kinetic Carbine's listed damage;
+  - the Damage_Resistance worked examples.
+
+  After a patch, run `theorycraft.refresh_catalog()`, then the tests. `WIKI_BASE_DPS` may need re-copying from the wiki.
+- **Where things are:**
+  - `theorycraft/MECHANICS.md`: the current model, and what is modelled, approximated or unknown.
+  - `theorycraft/RESEARCH.md`: the evidence (API field map, item research, data-vs-wiki disagreements).
+  - `theorycraft/item_effects.json`: per-item proc, shred and sustain specs, each with an uptime and confidence; edit it rather than code for item changes.
+- **Open:**
+  - **Shred on Guardians and Walkers** is undocumented, so it is a UI toggle, off by default.
+  - **Venator's `EWeaponDamageScale`/`EDamageScale` multipliers** are treated as 1.
+  - **Still unmodelled:** Decay, Express Shot, Escalating Exposure's amp, Lightning Scroll, Mystic Reverb, Consecrating Grenade's burn and Bullet Dance's gun buff.
+  - **Souls curves come from the server's sweep store (Oct 14 – Nov 1 2026).** Re-measure them with `measure_souls.py` once the store has fresh data.
+  - **deadlock-server's `ingest._series` docstring** still says the net-worth sample times are unknown. They are known now (see RESEARCH.md); update it in that repo.
+
 ## The rules that are load-bearing
 
 **`average_badge` is not a number you can do arithmetic on.** Badge =
