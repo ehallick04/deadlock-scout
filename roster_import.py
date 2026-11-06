@@ -136,8 +136,11 @@ def _division_spans(html):
 def parse_dse_directory(html):
     """
     The all-teams directory page.
-    -> [{'team': str, 'team_id': int, 'url': str, 'division': str}]
-    No account IDs live here -- only team names and team IDs.
+    -> [{'team': str, 'team_id': int, 'url': str, 'division': str,
+         'disbanded': bool}]
+    No account IDs live here -- only team names and team IDs. A disbanded
+    team keeps its card, marked `team-card--disbanded`; its own page then
+    lists no players, so in a harvest it looks like a failed fetch.
     """
     spans = _division_spans(html)
 
@@ -160,6 +163,7 @@ def parse_dse_directory(html):
                 "team_id": team_id,
                 "url": url,
                 "division": division_at(m.start()),
+                "disbanded": "team-card--disbanded" in m.group(0),
             })
 
     # last resort: any /teams/<id>/ link with text
@@ -174,7 +178,8 @@ def parse_dse_directory(html):
                 continue
             seen.add(tid)
             teams.append({"team": label[:40], "team_id": tid,
-                          "url": m.group(1), "division": division_at(m.start())})
+                          "url": m.group(1), "division": division_at(m.start()),
+                          "disbanded": False})
 
     return sorted(teams, key=lambda t: t["team"].lower())
 

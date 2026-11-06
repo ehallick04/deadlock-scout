@@ -10,6 +10,10 @@ Two ways to feed it:
 
          python build_rosters.py dse_rosters.html
 
+     Add the saved Teams directory page to drop disbanded teams:
+
+         python build_rosters.py dse_rosters.html --directory teams.html
+
   2. A folder of saved team pages (File > Save Page As on each team page).
      Drop the directory page in there too and divisions get filled in:
 
@@ -116,11 +120,75 @@ def build(source):
     }
 
 
+def carry_over_empty(data, html, previous):
+    """
+    Keep the last known roster for a team whose harvested page came back empty.
+
+    The harvester fetches each team page in turn, and a fetch that fails leaves
+    the team's marker with nothing after it. from_bundle() drops empty teams, so
+    without this a failed fetch looks exactly like a team leaving the league:
+    on 3 November 2026 two Div 3 teams vanished that way. A carried-over team is
+    marked `stale_since` with the date of the roster it came from, so nothing
+    downstream mistakes it for a fresh read.
+    -> names carried over
+    """
+    if not is_bundle(html):
+        return []
+    empty = {t["team"] for t in parse_bundle(html) if not t["players"]}
+    old_teams = (previous or {}).get("teams") or {}
+    carried = []
+    for name in sorted(empty):
+        if name in data["teams"] or name not in old_teams:
+            continue
+        entry = dict(old_teams[name])
+        entry.setdefault("stale_since",
+                         (previous.get("generated") or "")[:10] or "unknown")
+        data["teams"][name] = entry
+        carried.append(name)
+    data["teams"] = dict(sorted(data["teams"].items(),
+                                key=lambda kv: kv[0].lower()))
+    return carried
+
+
+def drop_disbanded(data, disbanded_ids):
+    """
+    Remove teams the league directory marks disbanded. -> names removed
+
+    By team id, never by name: names are reused and edited, ids are not.
+    Run after carry_over_empty(), because a disbanded team's page lists no
+    players and would otherwise be carried over as a stale roster.
+    """
+    gone = {int(i) for i in disbanded_ids}
+    removed = sorted(name for name, info in data["teams"].items()
+                     if int(info.get("team_id") or 0) in gone)
+    for name in removed:
+        del data["teams"][name]
+    return removed
+
+
+def disbanded_in(directory_path):
+    """Team ids the saved directory page marks disbanded."""
+    return {t["team_id"] for t in parse_dse_directory(read_html(directory_path))
+            if t.get("disbanded")}
+
+
 def main(argv):
+    directory = None
+    if "--directory" in argv:
+        at = argv.index("--directory")
+        directory = argv[at + 1]
+        argv = argv[:at] + argv[at + 2:]
     if len(argv) < 2:
         raise SystemExit(__doc__)
     data = build(argv[1])
     out = argv[2] if len(argv) > 2 else OUT
+    previous = None
+    if os.path.exists(out):
+        with open(out, encoding="utf-8") as fh:
+            previous = json.load(fh)
+    carried = (carry_over_empty(data, read_html(argv[1]), previous)
+               if not os.path.isdir(argv[1]) else [])
+    removed = drop_disbanded(data, disbanded_in(directory)) if directory else []
     with open(out, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2, ensure_ascii=False)
 
@@ -128,6 +196,14 @@ def main(argv):
     players = sum(len(t["players"]) for t in teams.values())
     empty = [n for n, t in teams.items() if not t["players"]]
     print(f"\nwrote {out}: {len(teams)} teams, {players} players")
+    if removed:
+        print(f"  {len(removed)} disbanded team(s) removed: {', '.join(removed)}")
+        carried = [n for n in carried if n not in removed]
+    elif not directory:
+        print("  no --directory page given, so disbanded teams are still in")
+    if carried:
+        print(f"  {len(carried)} page(s) came back empty; kept the previous "
+              f"roster, marked stale: {', '.join(carried)}")
     if empty:
         print(f"  {len(empty)} with no ids: {', '.join(empty[:5])}"
               + (" ..." if len(empty) > 5 else ""))

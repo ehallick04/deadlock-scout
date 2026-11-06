@@ -1,0 +1,1310 @@
+{
+ "_about": {
+  "generated": "2026-11-06",
+  "item_data": "items.json (live API dump, 6 Nov 2026). Street Brawl variants ignored. The wiki's 'Enhanced'/'Corrupted' tabs are Street Brawl too.",
+  "method": "Every number is a *_prop in the item's own properties unless the data lacks it (then *_value, explained in notes). Semantics (per hit vs per second, triggers, stacking, what counts as spirit damage) come from the rendered deadlock.wiki pages fetched 6 Nov 2026. Where they disagree on a number, the API wins.",
+  "sign_convention": "Shred props are NEGATIVE in the data (e.g. BulletArmorReduction=-8 means -8 percentage points). A shred's value is one source in the reduction pool: total_reduction = 1 - prod(1 - r_i); final_resist = total_resist - total_reduction, can go negative (Damage_Resistance). effects.shred() takes abs().",
+  "spirit_scaling": "A prop's own scale_function gives its spirit scaling (ETechPower: value + SP x stat_scale). Some props scale with ELevelUpBoons (per boon) or healing_boon_scale instead. Those are NOT spirit scaling and are noted per item.",
+  "uptime": "Fraction of a sustained 1v1 fight the effect is active, or for cooldown effects the share of cooldown windows actually used. Assumptions are in each 'why'. Range-, melee- and headshot-dependent ones are guesses to be tuned per hero.",
+  "empty_effects": "An item with effects [] is listed ON PURPOSE: what it does is either plain stats the simulator already reads or range bonuses simulate.stats() already handles. Note that an empty list makes simulate.item_damage fall back to its naive path, which finds no damage props for these items.",
+  "extension_stacks_prop_on_conditional_stat": "Berserker and Glass Cannon carry stacks_prop on conditional_stat (value x stacks x uptime). effects.conditional_stats() ignores it today and would count a single stack.",
+  "mislabelled_props": {
+   "_meaning": "Props with NO ConditionallyApplied flag that are in fact conditional (active-only, imbue-only, buff-only). data.Item.stat() reads them as permanent. They should be excluded like data.SCOPED_PROPS, and the conditional effect here then counts them correctly. Until then they are double counted (or, with no effect here, overcounted).",
+   "upgrade_ethereal_bullets": [
+    "BonusFireRate"
+   ],
+   "upgrade_quick_silver": [
+    "BonusFireRate"
+   ],
+   "upgrade_tech_overflow": [
+    "BonusFireRate",
+    "BonusSpirit",
+    "BonusSpiritLifesteal"
+   ],
+   "upgrade_surging_power": [
+    "ActiveBonusLifesteal"
+   ],
+   "upgrade_fury_trance": [
+    "TechResist"
+   ],
+   "upgrade_mystic_reverb": [
+    "ImbueAbilityLifesteal"
+   ],
+   "upgrade_focus_lens": [
+    "MagicResistReduction"
+   ],
+   "_flag_semantics": "IntrinsicallyProvidedInAbility is ambiguous: plain stat on Bullet Resist Shredder, Mystic Vulnerability, Siphon Bullets, Vampiric Burst, Infuser and Mystic Reverb's +8% lifesteal (all top-line on the wiki), but buff-only on Spiritual Overflow."
+  },
+  "not_found": [
+   "upgrade_point_blank (Point Blank is upgrade_close_quarter_combat)"
+  ],
+  "disabled": "None of the requested classes are disabled (all shopable=True, disabled None/False).",
+  "vocabulary": [
+   "bullet_lifesteal",
+   "bullet_shred",
+   "conditional_stat",
+   "headshot_bonus",
+   "heal_on_event",
+   "max_hp_dot",
+   "on_hit_spirit",
+   "periodic_spirit",
+   "regen",
+   "spirit_lifesteal",
+   "spirit_shred",
+   "unmodelled"
+  ]
+ },
+ "items": {
+  "upgrade_magic_burst": {
+   "name": "Mystic Burst",
+   "effects": [
+    {
+     "type": "periodic_spirit",
+     "damage_prop": "Damage",
+     "cooldown_prop": "AbilityChargeUpTime",
+     "uptime": 0.85,
+     "why": "Charge-up item: fires on the first spirit-damage ability hit dealing >80 base damage after the 14s charge. Spirit casters hit that threshold most charge windows; weapon heroes may not.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "Damage=40 flat; the API gives it no ETechPower scale_function. Threshold MinimumDamage=80 is checked on pre-mitigation spirit damage (wiki). Only spirit damage triggers it; separate damage instance after the ability. Charge-up, so cooldown reduction does not apply (wiki); AbilityCooldown and AbilityChargeUpTime are both 14. Procs on every hero hit by the same ability (multi-target ignored here). Spirit lifesteal heals from it (wiki).",
+   "sources": [
+    "https://deadlock.wiki/Mystic_Burst"
+   ]
+  },
+  "upgrade_crackshot": {
+   "name": "Mystic Shot",
+   "effects": [
+    {
+     "type": "on_hit_spirit",
+     "damage_prop": "ProcBonusMagicDamage",
+     "per": "shot",
+     "proc_chance_prop": "ProcChance",
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 0.9,
+     "why": "Fires with the next shot after the 8s cooldown; the cooldown starts even if the shot misses (wiki), so a few procs are wasted.",
+     "confidence": "high"
+    }
+   ],
+   "notes": "Extra spirit bullet, 40 + 0.9 x SP. Uses AbilityCooldown (8s, matches wiki); ProcCooldown=1 is an internal lockout. Cannot crit, immune to evasion, hits before the regular bullet so bullet shred applied by it amplifies that shot (wiki).",
+   "sources": [
+    "https://deadlock.wiki/Mystic_Shot"
+   ]
+  },
+  "upgrade_chain_lightning": {
+   "name": "Tesla Bullets",
+   "effects": [
+    {
+     "type": "on_hit_spirit",
+     "damage_prop": "DamagePerChain",
+     "per": "shot",
+     "proc_chance_prop": "ProcChance",
+     "cooldown_prop": "ProcCooldown",
+     "uptime": 1.0,
+     "why": "Pure per-shot proc; the rate is already capped by ProcChance and the 0.2s ProcCooldown.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "15% per shot (wiki: procs at most once per shot, so Ricochet/Split Shot do not raise it), 0.2s cooldown, 33 + 0.19 x SP spirit damage, reduced by spirit resist and falloff (wiki). Then chains to up to ChainCount=4 nearby enemies within 8m (multi-target ignored). BonusPerChain (also 33) is not explained anywhere I found; I assumed the primary target takes DamagePerChain only. Medium for that reason.",
+   "sources": [
+    "https://deadlock.wiki/Tesla_Bullets"
+   ]
+  },
+  "upgrade_toxic_bullets": {
+   "name": "Toxic Bullets",
+   "effects": [
+    {
+     "type": "max_hp_dot",
+     "pct_prop": "DotHealthPercent",
+     "unit": "per_second",
+     "duration_prop": "DotDuration",
+     "tick_prop": "TickRate",
+     "uptime": 0.75,
+     "why": "Bleed needs build-up to 100% first (hero-specific number of shots, longer at range), then further shots refresh the 4s bleed. In a sustained fight on one target, roughly the first second or two is ramp, after which it stays up while you keep landing shots.",
+     "confidence": "medium"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "-40% healing received on the bleeding target (HealAmpReceivePenaltyPercent / HealAmpRegenPenaltyPercent): an anti-heal debuff, not damage.",
+     "uptime": 0.75,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "DotHealthPercent=1.9 (+0.006 x SP) is % of target MAX health per second (wiki update log: 'Bleed damage increased from 1.7% to 1.9%'; enhanced tooltip reads '% DPS'), ticking every 0.5s for 4s = 7.6% max HP per application at 0 SP. It is spirit damage reduced by spirit resist; extended by ability duration. Does not build on Guardians/Walkers; Mid-boss is immune; 50% damage on troopers/denizens (DotMultiplerTroopers). Does not build with melee. BuildUpPerShot=1.28 is a multiplier on a per-hero table, not a percent.",
+   "sources": [
+    "https://deadlock.wiki/Toxic_Bullets",
+    "https://deadlock.wiki/Build-Up"
+   ]
+  },
+  "upgrade_ethereal_bullets": {
+   "name": "Mercurial Magnum",
+   "effects": [
+    {
+     "type": "periodic_spirit",
+     "damage_prop": "Damage",
+     "cooldown_prop": "AbilityChargeUpTime",
+     "uptime": 0.85,
+     "why": "Bonus damage on the imbued ability's first hit, once per 14s charge-up; assumes the imbued ability is cast about once per charge.",
+     "confidence": "medium"
+    },
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_FIRE_RATE",
+     "value_prop": "BonusFireRate",
+     "uptime": 0.8,
+     "why": "+22% fire rate for 12s after casting the imbued ability, once per 14s charge: 12/14 = 0.86 if cast on charge, shaded down for casting late.",
+     "confidence": "medium"
+    },
+    {
+     "type": "on_hit_spirit",
+     "damage_prop": "BulletsBonusMagicDamage",
+     "per": "bullet",
+     "uptime": 0.85,
+     "why": "Every bullet of the magazine loaded by the imbued cast deals the bonus, so at most one clip per 14s charge-up (cap clip_per_window), cast on ~85% of charges. Was 'uptime 0.4 of all bullets', which valued it at ~140 DPS on Haze -- several times its gun. BulletsBonusMagicDamage is a PERCENT of base bullet damage (postfix %, label 'Base Bullet Damage'), not flat.",
+     "confidence": "medium",
+     "cap": "clip_per_window",
+     "window_prop": "AbilityChargeUpTime",
+     "changed_by": "main session",
+     "damage_unit": "pct_base_bullet"
+    }
+   ],
+   "notes": "Charge-up 14s (AbilityChargeUpTime; AbilityCooldown is 15 in the data, the wiki shows 14s). BonusFireRate has NO ConditionallyApplied flag in the API but is only active after a cast: see _about.mislabelled_props. The +20% clip and +7 SP are plain stats.",
+   "sources": [
+    "https://deadlock.wiki/Mercurial_Magnum"
+   ]
+  },
+  "upgrade_capacitor": {
+   "name": "Capacitor",
+   "effects": [
+    {
+     "type": "on_hit_spirit",
+     "damage_prop": "DamagePerChain",
+     "per": "shot",
+     "proc_chance_prop": "ProcChance",
+     "cooldown_prop": "ProcCooldown",
+     "uptime": 1.0,
+     "why": "Same per-shot shock as Tesla, with Capacitor's own numbers.",
+     "confidence": "medium"
+    },
+    {
+     "type": "periodic_spirit",
+     "damage_prop": "Damage",
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 0.8,
+     "why": "Active projectile every 40s; assumes it is used most cooldowns and lands.",
+     "confidence": "medium"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "Active also applies a 60% slow (3s), stops stamina use and silences movement items/abilities: crowd control.",
+     "uptime": 0.1,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "Upgrade of Tesla Bullets (20% chance, 43 + 0.19 x SP, chains to 6). Active Damage=100 has no spirit scaling in the data. Same BonusPerChain caveat as Tesla.",
+   "sources": [
+    "https://deadlock.wiki/Capacitor"
+   ]
+  },
+  "upgrade_headshot_booster": {
+   "name": "Headshot Booster",
+   "effects": [
+    {
+     "type": "headshot_bonus",
+     "damage_type": "weapon",
+     "damage_prop": "HeadShotBonusDamage",
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 1.0,
+     "why": "The rate is already the headshot rate capped by the 9s cooldown; vs heroes only.",
+     "confidence": "high"
+    }
+   ],
+   "notes": "+45 weapon damage on the next headshot against a HERO every 9s. Affected by falloff; for shotguns the centre pellet must headshot. Not on troopers.",
+   "sources": [
+    "https://deadlock.wiki/Headshot_Booster"
+   ]
+  },
+  "upgrade_headhunter": {
+   "name": "Headhunter",
+   "effects": [
+    {
+     "type": "headshot_bonus",
+     "damage_type": "weapon",
+     "damage_prop": "HeadShotBonusDamage",
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 1.0,
+     "why": "Headshot rate capped by the 8s cooldown; vs heroes only.",
+     "confidence": "high"
+    },
+    {
+     "type": "heal_on_event",
+     "value_prop": "HealPercentPerHeadshot",
+     "event": "headshot",
+     "unit": "pct_max_hp",
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 1.0,
+     "why": "Same trigger as the bonus damage.",
+     "confidence": "low"
+    }
+   ],
+   "notes": "HeadShotBonusDamage=75 has scale_function ELevelUpBoons 4.0, i.e. +4 per boon (not spirit). The simulator's `.at(spirit)` will treat the 4.0 as no-scale unless it handles ELevelUpBoons. HealPercentPerHeadshot=4 (+0.06 per boon, scale_function_healing_boon_scale): neither the API nor the wiki says what it is a percent of. pct_max_hp (own max HP) is my assumption, hence low.",
+   "sources": [
+    "https://deadlock.wiki/Headhunter"
+   ]
+  },
+  "upgrade_thermal_detonator": {
+   "name": "Alchemical Fire",
+   "effects": [
+    {
+     "type": "bullet_shred",
+     "value_prop": "BulletArmorReduction",
+     "uptime": 0.15,
+     "why": "Shred only while the target stands in the 10m fire area: 5s per 30s cooldown = 0.17, minus time spent walking out.",
+     "confidence": "medium"
+    },
+    {
+     "type": "periodic_spirit",
+     "damage_prop": "DPSMax",
+     "damage_mult": 3.9,
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 0.8,
+     "why": "Ramping area DoT (DPS -> DPSMax over ~4.5s, 10 instances). Wiki total 384 at +10 SP = ~3.9 x DPSMax(SP) per 30s cast; 0.8 for casts where the target leaves the fire early.",
+     "confidence": "medium",
+     "added_by": "main session, from the research's closed form"
+    }
+   ],
+   "notes": "The shred scales with spirit power: BulletArmorReduction = -7 - 0.055 x SP (ETechPower stat_scale -0.055), so -12.5 at 100 SP. Because this item has an entry here, simulate.item_damage's naive 'Damage every cooldown' path is skipped, so its damage is 0 until the ramp is modelled.",
+   "sources": [
+    "https://deadlock.wiki/Alchemical_Fire"
+   ]
+  },
+  "upgrade_rupture": {
+   "name": "Decay",
+   "effects": [
+    {
+     "type": "unmodelled",
+     "reason": "Damage per second = DotHealthPercent (1.95 + 0.003 x SP)% of the target's CURRENT health, ticking 1/s for 12s, on a 30s active. It is non-lethal and does not apply item procs (except Spirit Burn, per wiki). max_hp_dot would overstate it because it uses max health.",
+     "uptime": 0.4,
+     "why": "",
+     "confidence": "high"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "-55% healing received for the duration (anti-heal).",
+     "uptime": 0.4,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "Targeted active, 20m + 0.1m x SP cast range. In 12 ticks on a target at full HP the current-HP rule gives about 20.9% of max HP at 0 SP (1-(1-0.0195)^12); less on a wounded target.",
+   "sources": [
+    "https://deadlock.wiki/Decay"
+   ]
+  },
+  "upgrade_discord": {
+   "name": "Scourge",
+   "effects": [
+    {
+     "type": "max_hp_dot",
+     "pct_prop": "MaxHealthPercentAsDPS",
+     "unit": "per_second",
+     "duration_prop": "AbilityDuration",
+     "tick_prop": "TickRate",
+     "uptime": 0.2,
+     "why": "Aura around a friendly target (usually self) for 10s per 35s cooldown = 0.29, and only enemies within 10m are hit, so lower in ranged fights.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "MaxHealthPercentAsDPS = 2.3 + 0.0055 x SP % of enemy max HP per second, 0.25s ticks. The +40% spirit resist and +20% debuff resist on the target are conditional (flagged) and defensive, not modelled. Only one Scourge active per hero.",
+   "sources": [
+    "https://deadlock.wiki/Scourge"
+   ]
+  },
+  "upgrade_mystic_reverb": {
+   "name": "Mystic Reverb",
+   "effects": [
+    {
+     "type": "unmodelled",
+     "reason": "Imbued ability: every 6.25s, 50% of the first damage instance of the imbued ability is dealt, after 3s, to enemies within 16m of the hit target (pre-mitigation, then reduced by spirit resist). The wiki does not say whether the primary target takes it. Needs per-ability damage.",
+     "uptime": 0.6,
+     "why": "",
+     "confidence": "medium"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "+22% spirit lifesteal on the imbued ability only (ImbueAbilityLifesteal), and a 32% slow.",
+     "uptime": 0.6,
+     "why": "",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "The +8% spirit lifesteal (AbilityLifestealPercentHero, flagged IntrinsicallyProvidedInAbility) is a plain top-line stat on the wiki and is already read by the simulator. ImbueAbilityLifesteal=22 is NOT flagged conditional but only applies to the imbued ability; see _about.mislabelled_props. MaxHealthDamage=10 (ConditionallyApplied) is in the data but on no tooltip or wiki text: unknown.",
+   "sources": [
+    "https://deadlock.wiki/Mystic_Reverb"
+   ]
+  },
+  "upgrade_magic_shock": {
+   "name": "Tankbuster",
+   "effects": [
+    {
+     "type": "periodic_spirit",
+     "damage_prop": "Damage",
+     "cooldown_prop": "AbilityChargeUpTime",
+     "uptime": 0.8,
+     "why": "Charge-up 14s; needs a single spirit-damage ability hit of more than 165 (pre-resist). Since July 2026 it no longer procs off items (wiki update log).",
+     "confidence": "medium",
+     "ignores_resist": true
+    },
+    {
+     "type": "unmodelled",
+     "reason": "Plus CurrentHealthDamage = 7.5% of the target's CURRENT health (after the triggering hit) per proc. The whole proc IGNORES spirit resist; the simulator's spirit_extra is multiplied by spirit resist.",
+     "uptime": 0.8,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "Upgrade of Mystic Burst. Damage=40 has no spirit scaling in the data. Positive spirit resist does not stop the threshold; negative resist and damage amps help reach it (wiki).",
+   "sources": [
+    "https://deadlock.wiki/Tankbuster"
+   ]
+  },
+  "upgrade_tech_damage_pulse": {
+   "name": "Torment Pulse",
+   "effects": [
+    {
+     "type": "periodic_spirit",
+     "damage_prop": "DamagePulseAmount",
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 0.55,
+     "why": "Pulses every 1.4s against the two closest enemies within 9m; uptime is the share of the fight spent within 9m of the target.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "25 + 0.23 x SP per pulse. Counts as spirit damage for on-spirit-damage effects (Bullet Resist Shredder, Escalating Exposure, Mystic Vulnerability) per wiki, which justifies high uptime on those for builds holding it.",
+   "sources": [
+    "https://deadlock.wiki/Torment_Pulse"
+   ]
+  },
+  "upgrade_spirit_burn": {
+   "name": "Spirit Burn",
+   "effects": [
+    {
+     "type": "periodic_spirit",
+     "damage_prop": "ExplosionDamage",
+     "cooldown_prop": "ImmunityDuration",
+     "uptime": 0.6,
+     "why": "Needs 500 spirit damage on one enemy inside 5s, then that enemy is immune for 20s. Spirit-heavy builds reach it most windows; others rarely.",
+     "confidence": "medium"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "Burn: DPS (24 + 0.06 x SP) for DebuffDuration 8s per proc (192 + 0.48 x SP total), once per 20s per enemy. The vocabulary has no flat DoT with spirit scaling; periodic_spirit on DPS would undercount 8x.",
+     "uptime": 0.6,
+     "why": "",
+     "confidence": "medium"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "-70% healing received while burning.",
+     "uptime": 0.6,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "ExplosionDamage=50 has no spirit scaling. Since July 2026 it hits only the primary target and the cooldown is per target (wiki update log). Half damage on non-heroes. ImmunityDuration=20 scales with item cooldown reduction.",
+   "sources": [
+    "https://deadlock.wiki/Spirit_Burn"
+   ]
+  },
+  "upgrade_berserker": {
+   "name": "Berserker",
+   "effects": [
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_WEAPON_DAMAGE_INCREASE",
+     "value_prop": "WeaponPowerPerStack",
+     "stacks_prop": "MaxStacks",
+     "uptime": 0.6,
+     "why": "One stack per 120 damage taken (pre-resist), stacks refresh for 10s, max 10. Taking ~200 DPS gets to max in ~6s and holds it. 0.6 = average share of the 10-stack maximum over a fight from first contact.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "+7% weapon damage per stack, 10 stacks = +70%. NOTE: effects.conditional_stats() ignores stacks_prop today, so it would count +7% x 0.6. The intended value is value x stacks x uptime.",
+   "sources": [
+    "https://deadlock.wiki/Berserker"
+   ]
+  },
+  "upgrade_split_shot": {
+   "name": "Split Shot",
+   "effects": [
+    {
+     "type": "unmodelled",
+     "reason": "Active: 5 multishot for 5s per 27s. A target can only be hit once per multishot, and the stacking +8% weapon damage needs hitting more than one hero with an attack, so it adds nothing in a 1v1 single-target sim.",
+     "uptime": 0.0,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "Multi-target only.",
+   "sources": [
+    "https://deadlock.wiki/Split_Shot"
+   ]
+  },
+  "upgrade_weapon_backstabber": {
+   "name": "Stalker",
+   "effects": [
+    {
+     "type": "bullet_shred",
+     "value_prop": "BulletResistReduction",
+     "uptime": 0.4,
+     "why": "Wound applied by weapon/melee damage within 8m, 5s debuff, 6s cooldown: 0.83 while in close range; 0.4 assumes half the fight inside 8m.",
+     "confidence": "medium"
+    },
+    {
+     "type": "periodic_spirit",
+     "damage_value": 85,
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 0.5,
+     "why": "One 5s wound per 6s cooldown while within 8m; same close-range share as the shred.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "Wound DoT = DPS 17 x DebuffDuration 5s = 85 spirit damage per application (literal, because the data gives only the per-second number; no spirit scaling). The DoT triggers on-spirit-damage effects (wiki). Close range is affected by ability range.",
+   "sources": [
+    "https://deadlock.wiki/Stalker"
+   ]
+  },
+  "upgrade_quick_silver": {
+   "name": "Quicksilver Reload",
+   "effects": [
+    {
+     "type": "periodic_spirit",
+     "damage_prop": "Damage",
+     "cooldown_prop": "AbilityChargeUpTime",
+     "uptime": 0.85,
+     "why": "Bonus on the imbued ability's first hit, once per 18s charge.",
+     "confidence": "medium"
+    },
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_FIRE_RATE",
+     "value_prop": "BonusFireRate",
+     "uptime": 0.6,
+     "why": "+10% fire rate for 12s after the imbued cast, once per 18s: 0.67 at best.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "BonusFireRate is NOT flagged conditional in the API: see _about.mislabelled_props. The bonus damage applies only if the imbued ability deals weapon or spirit damage (not pure).",
+   "sources": [
+    "https://deadlock.wiki/Quicksilver_Reload"
+   ]
+  },
+  "upgrade_cloaking_device_active": {
+   "name": "Shadow Weave",
+   "effects": [
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_WEAPON_DAMAGE_INCREASE",
+     "value_prop": "AmbushBonusWeaponDamage",
+     "uptime": 0.12,
+     "why": "Ambush lasts 5s after breaking stealth, once per 37s cooldown, and full strength needs 6s of stealth first: 5/37 = 0.135.",
+     "confidence": "medium"
+    },
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_TECH_POWER",
+     "value_prop": "AmbushBonusTechPower",
+     "uptime": 0.12,
+     "why": "Same ambush window.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "API and the wiki tooltip agree: +50% weapon damage and +25 SP during a 5s ambush. A wiki note still describes a '25% fire rate' ramp after stealth, which is stale.",
+   "sources": [
+    "https://deadlock.wiki/Shadow_Weave"
+   ]
+  },
+  "upgrade_glass_cannon": {
+   "name": "Glass Cannon",
+   "effects": [
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_FIRE_RATE",
+     "value_prop": "FireRatePerKill",
+     "stacks_prop": "MaxStacks",
+     "uptime": 0.3,
+     "why": "+7% fire rate per hero kill, max 8, lose 1 on death. 0.3 is about 2-3 of 8 stacks on average.",
+     "confidence": "low"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "The data has a 30% slow from bullet build-up (SlowPercent, BuildUpPerShot, BuildUpDuration) that no wiki or tooltip text mentions. Unknown if live.",
+     "uptime": 0.0,
+     "why": "",
+     "confidence": "low"
+    }
+   ],
+   "notes": "+85% weapon damage and -13% max HP are plain stats. effects.conditional_stats() ignores stacks_prop today.",
+   "sources": [
+    "https://deadlock.wiki/Glass_Cannon"
+   ]
+  },
+  "upgrade_ultimate_burst": {
+   "name": "Lightning Scroll",
+   "effects": [
+    {
+     "type": "unmodelled",
+     "reason": "Damage (150 + 0.35 x SP) spirit plus a 0.75s stun after a 3s delay, once per target per ultimate cast. Needs the hero's ultimate cooldown, which is not item data.",
+     "uptime": 0.9,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "Some heroes cannot buy it (ultimates cannot trigger it). Also carries Mystic Slow effects (24% slow, -12% dash).",
+   "sources": [
+    "https://deadlock.wiki/Lightning_Scroll"
+   ]
+  },
+  "upgrade_close_quarter_combat": {
+   "name": "Point Blank",
+   "effects": [],
+   "notes": "No effects listed ON PURPOSE: CloseRangeBonusWeaponPower (+50% weapon damage within 15m) uses MODIFIER_VALUE_CLOSE_RANGE_WEAPON_DAMAGE_INCREASE, which simulate.stats() already applies by target distance. Adding a conditional_stat would double count. The 20% slow on bullets is CC, not modelled. (The prompt guessed upgrade_point_blank; that class does not exist.)",
+   "sources": [
+    "https://deadlock.wiki/Point_Blank"
+   ]
+  },
+  "upgrade_burst_fire": {
+   "name": "Burst Fire",
+   "effects": [
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_FIRE_RATE",
+     "value_prop": "ActivatedFireRate",
+     "uptime": 0.5,
+     "why": "+32% fire rate for 4.5s when a bullet hits a hero, 9s cooldown: 4.5/9 = 0.5 in sustained fighting.",
+     "confidence": "high"
+    }
+   ],
+   "notes": "The +10% fire rate is a plain stat.",
+   "sources": [
+    "https://deadlock.wiki/Burst_Fire"
+   ]
+  },
+  "upgrade_critshot": {
+   "name": "Lucky Shot",
+   "effects": [
+    {
+     "type": "weapon_multiplier",
+     "chance_prop": "ProcChance",
+     "bonus_prop": "CritDamagePercent",
+     "uptime": 1.0,
+     "why": "25% of bullets deal +100% of the bullet's pre-crit damage: a separate multiplier (~x1.25), not additive weapon damage. The non-crit-share correction is ignored (overstates slightly at high headshot rates).",
+     "confidence": "medium",
+     "added_by": "main session, from the research's closed form"
+    }
+   ],
+   "notes": "Bonus damage cannot crit; immune to evasion; pierces Plated Armor on proc.",
+   "sources": [
+    "https://deadlock.wiki/Lucky_Shot"
+   ]
+  },
+  "upgrade_sharpshooter": {
+   "name": "Sharpshooter",
+   "effects": [],
+   "notes": "No effects listed ON PURPOSE: LongRangeBonusWeaponPower (+60% beyond 15m) is MODIFIER_VALUE_LONG_RANGE_BULLET_DAMAGE_INCREASE, which simulate.stats() already applies by distance. Other stats are plain.",
+   "sources": [
+    "https://deadlock.wiki/Sharpshooter"
+   ]
+  },
+  "upgrade_aprounds": {
+   "name": "Armor Piercer",
+   "effects": [
+    {
+     "type": "unmodelled",
+     "reason": "60% of bullets ignore the target's bullet resist (and evasion, barriers) and pierce. Wiki: on those bullets all bullet shred becomes ADDITIVE instead of multiplicative, so final resist is presumably 0 - sum(shred) (negative). Expected weapon multiplier = 0.4 x (1 - R_final) + 0.6 x (1 + sum_shred).",
+     "uptime": 1.0,
+     "why": "",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "Does not damage invincible/petrified targets.",
+   "sources": [
+    "https://deadlock.wiki/Armor_Piercer"
+   ]
+  },
+  "upgrade_intensifying_clip": {
+   "name": "Intensifying Magazine",
+   "effects": [
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_WEAPON_DAMAGE_INCREASE",
+     "value_prop": "BaseAttackDamagePercentAtMaxDuration",
+     "uptime": 0.6,
+     "why": "Ramps from 0 to +45% weapon damage over 2.5s of continuous fire, presumably resetting when you stop or reload. Over a long magazine the average is close to 45% minus the ramp; 0.6 allows for the ramp and gaps.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "Ramp assumed linear (the wiki says it 'ramps up'). Reset rule on stopping fire is not stated.",
+   "sources": [
+    "https://deadlock.wiki/Intensifying_Magazine"
+   ]
+  },
+  "upgrade_express_shot": {
+   "name": "Express Shot",
+   "effects": [
+    {
+     "type": "unmodelled",
+     "reason": "Every 8s the next attack fires twice; both shots deal +125% weapon damage (ProcBaseAttackDamagePercent, +2 per boon), cannot crit, use 2 ammo. Extra damage per proc = base attack x (2 x 2.25 - 1). Burst weapons: the first burst's first bullet and the whole second burst get the bonus. Needs per-attack damage.",
+     "uptime": 1.0,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "ProcBaseAttackDamagePercentAltFire=38 applies to alt-fire weapons (Shiv, Viscous, Yamato, Paradox carbine).",
+   "sources": [
+    "https://deadlock.wiki/Express_Shot"
+   ]
+  },
+  "upgrade_tech_overflow": {
+   "name": "Spiritual Overflow",
+   "effects": [
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_FIRE_RATE",
+     "value_prop": "BonusFireRate",
+     "uptime": 0.6,
+     "why": "Build-up from shooting heroes, then a 15s buff. The rebuild rule is not documented; 0.6 assumes build-up takes a few seconds of shooting per 15s buff.",
+     "confidence": "low"
+    },
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_TECH_POWER",
+     "value_prop": "BonusSpirit",
+     "uptime": 0.6,
+     "why": "Same buff window.",
+     "confidence": "low"
+    },
+    {
+     "type": "spirit_lifesteal",
+     "value_prop": "BonusSpiritLifesteal",
+     "uptime": 0.6,
+     "why": "Same buff window.",
+     "confidence": "low"
+    }
+   ],
+   "notes": "The three buff props are flagged IntrinsicallyProvidedInAbility, NOT ConditionallyApplied, so the simulator currently reads +25% fire rate, +30 SP and +10% spirit lifesteal as permanent: see _about.mislabelled_props. The +15% spirit lifesteal, +8 SP, +13% duration and +90 HP are plain. Build-up accumulates on the target being shot (wiki Build-Up).",
+   "sources": [
+    "https://deadlock.wiki/Spiritual_Overflow",
+    "https://deadlock.wiki/Build-Up"
+   ]
+  },
+  "upgrade_ricochet": {
+   "name": "Ricochet",
+   "effects": [
+    {
+     "type": "unmodelled",
+     "reason": "Bullets bounce to 2 more enemies within 13m for 65% damage: multi-target only. Ricochet bullets cannot headshot and do not apply Tesla or Siphon Bullets.",
+     "uptime": 0.0,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "+18% fire rate is plain.",
+   "sources": [
+    "https://deadlock.wiki/Ricochet"
+   ]
+  },
+  "upgrade_long_range": {
+   "name": "Long Range",
+   "effects": [],
+   "notes": "No effects listed ON PURPOSE: +40% weapon damage beyond 15m is MODIFIER_VALUE_LONG_RANGE_BULLET_DAMAGE_INCREASE, already applied by simulate.stats() by distance.",
+   "sources": [
+    "https://deadlock.wiki/Long_Range"
+   ]
+  },
+  "upgrade_withering_whip": {
+   "name": "Rusted Barrel",
+   "effects": [
+    {
+     "type": "bullet_shred",
+     "value_prop": "BulletArmorReduction",
+     "uptime": 0.3,
+     "why": "Targeted active: 5s per 16s cooldown = 0.31.",
+     "confidence": "high"
+    }
+   ],
+   "notes": "Also -32% enemy fire rate (defensive, not modelled).",
+   "sources": [
+    "https://deadlock.wiki/Rusted_Barrel"
+   ]
+  },
+  "upgrade_bullet_resist_shredder": {
+   "name": "Bullet Resist Shredder",
+   "effects": [
+    {
+     "type": "bullet_shred",
+     "value_prop": "BulletArmorReduction",
+     "uptime": 0.75,
+     "why": "Applied (8s) whenever you deal spirit damage. Near 1.0 with any frequent spirit source (Torment Pulse, Tesla, Mystic Shot, DoTs); lower for pure gun builds. 0.75 is a middle value.",
+     "confidence": "high"
+    }
+   ],
+   "notes": "Does not stack with itself; reapplying refreshes the duration. Teammates benefit. The +9% bullet resist (IntrinsicallyProvidedInAbility) is a plain stat per the wiki.",
+   "sources": [
+    "https://deadlock.wiki/Bullet_Resist_Shredder"
+   ]
+  },
+  "upgrade_greater_withering_whip": {
+   "name": "Disarming Hex",
+   "effects": [
+    {
+     "type": "bullet_shred",
+     "value_prop": "BulletArmorReduction",
+     "uptime": 0.25,
+     "why": "Targeted active: 4.25s per 16s cooldown = 0.27.",
+     "confidence": "high"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "Disarms the target (CC).",
+     "uptime": 0.25,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "",
+   "sources": [
+    "https://deadlock.wiki/Disarming_Hex"
+   ]
+  },
+  "upgrade_hollow_point_rounds": {
+   "name": "Hollow Point",
+   "effects": [
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_WEAPON_DAMAGE_INCREASE",
+     "value_prop": "BaseAttackDamagePercent",
+     "uptime": 0.5,
+     "why": "Only while YOU are above 65% health. In a fight to the death you are above that roughly the first half.",
+     "confidence": "medium"
+    },
+    {
+     "type": "bullet_shred",
+     "value_prop": "BulletArmorReduction",
+     "uptime": 0.6,
+     "why": "Bullets apply the -10% for 8s while you are above 65% HP; the debuff lasts 8s after you drop below.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "Wiki update log: -9% -> -10% on 16 Sep 2026, so the API and wiki agree.",
+   "sources": [
+    "https://deadlock.wiki/Hollow_Point"
+   ]
+  },
+  "upgrade_headshot_booster2": {
+   "name": "Weakening Headshot",
+   "effects": [
+    {
+     "type": "bullet_shred",
+     "value_prop": "BulletResistReduction",
+     "uptime": 0.85,
+     "why": "12s debuff on any headshot; one headshot per 12s is easy in a sustained fight.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "DiminishingMultiplier=0.5 is in the data with no explanation anywhere (wiki or tooltip). Unknown; maybe a reduction when it overlaps Crippling Headshot from a teammate.",
+   "sources": [
+    "https://deadlock.wiki/Weakening_Headshot"
+   ]
+  },
+  "upgrade_banshee_slugs": {
+   "name": "Crippling Headshot",
+   "effects": [
+    {
+     "type": "bullet_shred",
+     "value_prop": "BulletResistReduction",
+     "uptime": 0.85,
+     "why": "12s debuff per headshot.",
+     "confidence": "medium"
+    },
+    {
+     "type": "spirit_shred",
+     "value_prop": "MagicResistReduction",
+     "uptime": 0.85,
+     "why": "Same debuff.",
+     "confidence": "medium"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "-40% healing received.",
+     "uptime": 0.85,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "The triggering headshot is not amplified (debuff is applied after). Does not stack with itself. DiminishingMultiplier=0.5 unexplained (as Weakening Headshot).",
+   "sources": [
+    "https://deadlock.wiki/Crippling_Headshot"
+   ]
+  },
+  "upgrade_acolytes_glove": {
+   "name": "Spirit Strike",
+   "effects": [
+    {
+     "type": "periodic_spirit",
+     "damage_prop": "SpiritDamage",
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 0.3,
+     "why": "Fires on a melee hit against a hero, 8s cooldown (16s for light melee). 0.3 assumes melee in about a third of the cooldown windows; set it per playstyle.",
+     "confidence": "low"
+    },
+    {
+     "type": "spirit_shred",
+     "value_prop": "TechArmorDamageReduction",
+     "uptime": 0.25,
+     "why": "6s debuff per proc, 8s cooldown, times the same melee share.",
+     "confidence": "low"
+    }
+   ],
+   "notes": "40 + 0.372 x SP spirit damage. Abilities that deal melee damage also trigger it (wiki list).",
+   "sources": [
+    "https://deadlock.wiki/Spirit_Strike"
+   ]
+  },
+  "upgrade_magic_vulnerability": {
+   "name": "Mystic Vulnerability",
+   "effects": [
+    {
+     "type": "spirit_shred",
+     "value_prop": "TechArmorDamageReduction",
+     "uptime": 0.8,
+     "why": "7s debuff whenever the target takes your spirit damage; refreshes, does not stack.",
+     "confidence": "high"
+    }
+   ],
+   "notes": "Does not stack with Escalating Exposure's debuff (EE takes priority). The +8% spirit resist is plain.",
+   "sources": [
+    "https://deadlock.wiki/Mystic_Vulnerability"
+   ]
+  },
+  "upgrade_tech_defense_shredders": {
+   "name": "Spirit Shredder",
+   "effects": [
+    {
+     "type": "spirit_shred",
+     "value_prop": "TechArmorDamageReduction",
+     "uptime": 0.95,
+     "why": "Applied by every bullet or melee hit, 8s duration.",
+     "confidence": "high"
+    },
+    {
+     "type": "spirit_lifesteal",
+     "value_prop": "AbilityLifestealPercentHero",
+     "uptime": 0.95,
+     "why": "Same debuff: +10% spirit lifesteal against the debuffed target for you and allies.",
+     "confidence": "high"
+    }
+   ],
+   "notes": "The lifesteal prop uses MODIFIER_VALUE_TECH_DAMAGE_TAKEN_HEALS_ATTACKER and is flagged conditional, so the simulator does not already read it. Wiki: it shares the diminishing (multiplicative) stacking with other spirit lifesteal.",
+   "sources": [
+    "https://deadlock.wiki/Spirit_Shredder"
+   ]
+  },
+  "upgrade_spellslinger_headshots": {
+   "name": "Spirit Rend",
+   "effects": [
+    {
+     "type": "spirit_shred",
+     "value_prop": "TechArmorDamageReduction",
+     "uptime": 0.95,
+     "why": "Base debuff from every bullet/melee hit, 8s.",
+     "confidence": "high"
+    },
+    {
+     "type": "spirit_shred",
+     "value_prop": "MagicResistReduction",
+     "stacks_prop": "MaxStacks",
+     "uptime": 0.6,
+     "why": "Headshot stacks: -7% each, max 4, 2s proc cooldown, 8s duration refreshed on each stack. Holding 4 needs a headshot every ~2-8s.",
+     "confidence": "medium"
+    },
+    {
+     "type": "spirit_lifesteal",
+     "value_prop": "AbilityLifestealPercentHero",
+     "uptime": 0.95,
+     "why": "+10% spirit lifesteal vs the debuffed target.",
+     "confidence": "high"
+    }
+   ],
+   "notes": "Wiki: max is -33.76%, which means the 4 stacks ADD to -28% and that is multiplied with the base -8% (1 - 0.92 x 0.72). So the two separate shred entries here, combined multiplicatively, reproduce it.",
+   "sources": [
+    "https://deadlock.wiki/Spirit_Rend",
+    "https://deadlock.wiki/Damage_Resistance"
+   ]
+  },
+  "upgrade_spirit_snatch": {
+   "name": "Spirit Snatch",
+   "effects": [
+    {
+     "type": "periodic_spirit",
+     "damage_prop": "SpiritDamage",
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 0.3,
+     "why": "Melee hit vs a hero, 6s cooldown; light melee effects -30%. 0.3 = assumed melee share.",
+     "confidence": "low"
+    },
+    {
+     "type": "spirit_shred",
+     "value_prop": "TechArmorDamageReduction",
+     "uptime": 0.35,
+     "why": "Steals 12 spirit resist for 10s per proc (6s cooldown): up to 1.0 if meleeing every cooldown; scaled by melee share.",
+     "confidence": "low"
+    },
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_TECH_POWER",
+     "value_prop": "TechPowerGain",
+     "uptime": 0.35,
+     "why": "Gain 25 SP for 10s (taken from the target).",
+     "confidence": "low"
+    }
+   ],
+   "notes": "50 + 0.84 x SP. TechArmorGain (+12 own spirit resist) is defensive. Buffs drop if the marked target dies.",
+   "sources": [
+    "https://deadlock.wiki/Spirit_Snatch"
+   ]
+  },
+  "upgrade_escalating_exposure": {
+   "name": "Escalating Exposure",
+   "effects": [
+    {
+     "type": "spirit_shred",
+     "value_prop": "TechArmorDamageReduction",
+     "uptime": 0.85,
+     "why": "-8% for 12s whenever you deal spirit damage.",
+     "confidence": "high"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "Stacking spirit amp: +4.5% (MagicIncreasePerStack) of your spirit damage to the target per stack, max 12 (+54%), one stack per 0.7s of spirit damage, 12s duration. Dealt as a separate damage instance after the original (wiki). Roughly a x(1 + 0.045 x avg_stacks) multiplier on spirit damage; no vocabulary type for it.",
+     "uptime": 0.85,
+     "why": "",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "The +17% spirit resist is plain.",
+   "sources": [
+    "https://deadlock.wiki/Escalating_Exposure"
+   ]
+  },
+  "upgrade_focus_lens": {
+   "name": "Focus Lens",
+   "effects": [
+    {
+     "type": "spirit_shred",
+     "value_prop": "MagicResistReduction",
+     "uptime": 0.3,
+     "why": "Targeted active: -9% for 12s per 40s cooldown = 0.3.",
+     "confidence": "high"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "Silences 4.5s; when it ends the target takes 35% of all damage dealt to it during the silence, from all sources, credited to the caster. About +35% damage for 4.5s of every 40s. Also -30 SP to the target.",
+     "uptime": 0.11,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "MagicResistReduction has NO ConditionallyApplied flag (it is an enemy debuff); TechPowerReduction is already excluded by data.SCOPED_PROPS.",
+   "sources": [
+    "https://deadlock.wiki/Focus_Lens"
+   ]
+  },
+  "upgrade_spirit_sap": {
+   "name": "Spirit Sap",
+   "effects": [
+    {
+     "type": "spirit_shred",
+     "value_prop": "MagicResistReduction",
+     "uptime": 0.5,
+     "why": "Targeted active: 12s per 22s cooldown = 0.55.",
+     "confidence": "high"
+    }
+   ],
+   "notes": "Also -30 SP to the target (TechPowerReduction, unflagged, already excluded by SCOPED_PROPS). Cooldown went 18 -> 22s on 30 Oct 2026; the API has 22.",
+   "sources": [
+    "https://deadlock.wiki/Spirit_Sap"
+   ]
+  },
+  "upgrade_bullet_armor_reduction_aura": {
+   "name": "Hunter's Aura",
+   "effects": [
+    {
+     "type": "bullet_shred",
+     "value_prop": "BulletArmorReduction",
+     "stacks_prop": "SingleTargetPlayerMultiplier",
+     "uptime": 0.7,
+     "why": "Passive aura within 15m (ability range applies; since 30 Oct 2026 only with line of sight). 0.7 = share of the fight in range and in sight.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "-10% bullet resist, doubled to -20% (and -30% fire rate) when only ONE enemy hero is nearby (SingleTargetPlayerMultiplier=2; wiki: a plain doubling, not stacking). stacks_prop encodes the 1v1 case; in teamfights use 1. BulletArmorReduction has no provided_property_type in the data. Does not stack across teammates.",
+   "sources": [
+    "https://deadlock.wiki/Hunter's_Aura"
+   ]
+  },
+  "upgrade_vampire": {
+   "name": "Bullet Lifesteal",
+   "effects": [],
+   "notes": "No effects ON PURPOSE: BulletLifestealPercent=15 is an unconditional MODIFIER_VALUE_BULLET_LIFESTEAL that simulate.stats() already reads. Listing it would double count. NOTE: the simulator SUMS lifesteal; the wiki says sources stack multiplicatively (1 - prod(1 - L)).",
+   "sources": [
+    "https://deadlock.wiki/Bullet_Lifesteal_(item)",
+    "https://deadlock.wiki/Lifesteal"
+   ]
+  },
+  "upgrade_health_stealing_magic": {
+   "name": "Spirit Lifesteal",
+   "effects": [],
+   "notes": "No effects ON PURPOSE: AbilityLifestealPercentHero=15 (MODIFIER_VALUE_TECH_LIFESTEAL, unflagged) is already read. NonHeroAbilityLifestealTooltipOnly=3 suggests 3% (20% of 15%) vs non-heroes; the wiki Lifesteal page says spirit lifesteal is 40% effective vs creeps. Disagreement.",
+   "sources": [
+    "https://deadlock.wiki/Spirit_Lifesteal_(item)",
+    "https://deadlock.wiki/Lifesteal"
+   ]
+  },
+  "upgrade_endurance": {
+   "name": "Extra Regen",
+   "effects": [],
+   "notes": "No effects ON PURPOSE: BonusHealthRegen=2.5 (MODIFIER_VALUE_HEALTH_REGEN_PER_SECOND, unflagged) is already read as in-combat regen. OutOfCombatHealthRegen=1.5 does not apply in a fight.",
+   "sources": [
+    "https://deadlock.wiki/Extra_Regen"
+   ]
+  },
+  "upgrade_health_stimpak": {
+   "name": "Healing Rite",
+   "effects": [
+    {
+     "type": "regen",
+     "value_prop": "TotalHealthRegen",
+     "in_combat": false,
+     "unit": "total_over_duration",
+     "duration_prop": "RegenDuration",
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 0.0,
+     "why": "Dispelled when you take damage from enemy players or objectives, so it does nothing in a sustained fight. It is for between fights (in_combat false).",
+     "confidence": "high"
+    }
+   ],
+   "notes": "300 total over 20s, 70s cooldown. TotalHealthRegen scale_function is scale_function_healing_spirit_scale with stat_scale 1.1 but no specific_stat_scale_type; the wiki shows '300 x1.1', presumably +1.1 per spirit power. Unconfirmed.",
+   "sources": [
+    "https://deadlock.wiki/Healing_Rite"
+   ]
+  },
+  "upgrade_medic_bullets": {
+   "name": "Restorative Shot",
+   "effects": [
+    {
+     "type": "heal_on_event",
+     "value_prop": "HealFromHero",
+     "event": "hit",
+     "unit": "flat",
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 0.9,
+     "why": "Next bullet after the 6s cooldown; cooldown starts even on a miss (wiki).",
+     "confidence": "high"
+    }
+   ],
+   "notes": "50 from a hero hit, 20 (HealFromNPC) from NPCs/orbs.",
+   "sources": [
+    "https://deadlock.wiki/Restorative_Shot"
+   ]
+  },
+  "upgrade_fury_trance": {
+   "name": "Fury Trance",
+   "effects": [
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_FIRE_RATE",
+     "value_prop": "ActiveBonusFireRate",
+     "uptime": 0.35,
+     "why": "Active: 6.5s per 18s = 0.36. It silences you, so it costs ability damage while up.",
+     "confidence": "high"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "Active also gives +40% spirit resist and +1.5m move speed, and silences you (no abilities) and disables stamina for 6.5s.",
+     "uptime": 0.35,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "ActiveBonusFireRate has no provided_property_type, so it is not read. TechResist=40 IS typed MODIFIER_VALUE_TECH_RESIST with no conditional flag, so the simulator reads +40% spirit resist as PERMANENT; the wiki tooltip has it only in the active. See _about.mislabelled_props. The +15% bullet lifesteal is plain.",
+   "sources": [
+    "https://deadlock.wiki/Fury_Trance"
+   ]
+  },
+  "upgrade_damage_recycler": {
+   "name": "Leech",
+   "effects": [],
+   "notes": "No effects ON PURPOSE: 30% bullet and 30% spirit lifesteal are unconditional and already read.",
+   "sources": [
+    "https://deadlock.wiki/Leech"
+   ]
+  },
+  "upgrade_siphon_bullets": {
+   "name": "Siphon Bullets",
+   "effects": [
+    {
+     "type": "max_hp_dot",
+     "pct_prop": "HealthStealPctHero",
+     "unit": "per_tick",
+     "tick_prop": "ProcCooldown",
+     "uptime": 0.9,
+     "why": "Proc on a bullet hit at most once per 1.2s (ProcCooldown) while shooting.",
+     "confidence": "medium",
+     "ignores_resist": true,
+     "heals_self": true
+    },
+    {
+     "type": "unmodelled",
+     "reason": "Each proc also heals you by and raises your max HP by the amount stolen (17s, refreshing, stacks without limit), and lowers the target's max HP; the next proc is based on the reduced max HP (decays). Healing = damage dealt, but is not reduced by healing reduction.",
+     "uptime": 0.9,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "2.5% of enemy MAX HP per proc, reduced by falloff. Wiki: the damage is NOT changed by bullet/spirit resist or damage amps. The simulator treats pct_hp as spirit damage and multiplies by spirit resist, which is wrong for this item. Does not proc item effects; Ricochet cannot spread it.",
+   "sources": [
+    "https://deadlock.wiki/Siphon_Bullets"
+   ]
+  },
+  "upgrade_infuser": {
+   "name": "Infuser",
+   "effects": [
+    {
+     "type": "spirit_lifesteal",
+     "value_prop": "AbilityLifestealPercentHero",
+     "uptime": 0.23,
+     "why": "Active: 7s per 30s = 0.23.",
+     "confidence": "high"
+    },
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_TECH_POWER",
+     "value_prop": "BonusSpirit",
+     "uptime": 0.23,
+     "why": "Same active.",
+     "confidence": "high"
+    }
+   ],
+   "notes": "The passive 15% spirit lifesteal (AbilityLifestealPercentHeroPassive), +8 SP, +10% spirit resist are plain and already read.",
+   "sources": [
+    "https://deadlock.wiki/Infuser"
+   ]
+  },
+  "upgrade_fervor": {
+   "name": "Frenzy",
+   "effects": [
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_FIRE_RATE",
+     "value_prop": "FervorFireRate",
+     "uptime": 0.35,
+     "why": "Triggers when you drop below 50% HP: +40% fire rate for 10s, 16s cooldown. In a fight to the death you spend about the second half below 50%, and the buff covers 10 of each 16s.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "+15% fire rate, +10% bullet lifesteal, +160 HP are plain. Move speed and debuff resist are not modelled.",
+   "sources": [
+    "https://deadlock.wiki/Frenzy"
+   ]
+  },
+  "upgrade_surging_power": {
+   "name": "Vampiric Burst",
+   "effects": [
+    {
+     "type": "bullet_lifesteal",
+     "value_prop": "ActiveBonusLifesteal",
+     "uptime": 0.17,
+     "why": "Active: 5s per 30s = 0.17.",
+     "confidence": "high"
+    },
+    {
+     "type": "conditional_stat",
+     "stat": "MODIFIER_VALUE_FIRE_RATE",
+     "value_prop": "ActiveBonusFireRate",
+     "uptime": 0.17,
+     "why": "Same active.",
+     "confidence": "high"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "Active also adds 75% ammo, not limited by magazine size.",
+     "uptime": 0.17,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "ActiveBonusLifesteal=75 is typed MODIFIER_VALUE_BULLET_LIFESTEAL with NO conditional flag: the simulator currently reads a PERMANENT 75% bullet lifesteal. See _about.mislabelled_props. The 15% passive lifesteal is plain.",
+   "sources": [
+    "https://deadlock.wiki/Vampiric_Burst"
+   ]
+  },
+  "upgrade_juggernaut": {
+   "name": "Juggernaut",
+   "effects": [],
+   "notes": "No effects ON PURPOSE: BonusHealthRegen=15 is unconditional MODIFIER_VALUE_HEALTH_REGEN_PER_SECOND and already read. The -40% fire-rate slow on enemies that shoot you is defensive.",
+   "sources": [
+    "https://deadlock.wiki/Juggernaut"
+   ]
+  },
+  "upgrade_boxing_glove": {
+   "name": "Lifestrike",
+   "effects": [
+    {
+     "type": "heal_on_event",
+     "value_prop": "LifestealHeal",
+     "event": "hit",
+     "unit": "flat",
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 0.3,
+     "why": "Heals on a melee hit, 4s cooldown (6s for light melee). 0.3 = assumed share of cooldowns with a melee hit.",
+     "confidence": "medium"
+    },
+    {
+     "type": "unmodelled",
+     "reason": "Plus LifestealHealPercent = 35% of the melee damage dealt. Also a 48% slow.",
+     "uptime": 0.3,
+     "why": "",
+     "confidence": "high"
+    }
+   ],
+   "notes": "event=hit means a MELEE hit here; the simulator's 'hit' rate is bullet hits, capped by the cooldown, which assumes a melee every cooldown before uptime. LifestealHeal 120 and LifestealHealPercent 35 scale per boon (healing_boon_scale 1.75 and 0.5). 40% effective vs non-heroes.",
+   "sources": [
+    "https://deadlock.wiki/Lifestrike",
+    "https://deadlock.wiki/Lifesteal"
+   ]
+  },
+  "upgrade_lifestrike_gauntlets": {
+   "name": "Melee Lifesteal",
+   "effects": [
+    {
+     "type": "heal_on_event",
+     "value_prop": "LifestrikeHeal",
+     "event": "hit",
+     "unit": "flat",
+     "cooldown_prop": "AbilityCooldown",
+     "uptime": 0.3,
+     "why": "Next melee hit heals, 8s cooldown (12s for light melee). 0.3 = assumed melee share.",
+     "confidence": "medium"
+    }
+   ],
+   "notes": "100 flat. 30% effective vs non-heroes. LifestrikeHealPercent exists in the data with value null. Same melee-not-bullet caveat as Lifestrike.",
+   "sources": [
+    "https://deadlock.wiki/Melee_Lifesteal",
+    "https://deadlock.wiki/Lifesteal"
+   ]
+  }
+ }
+}
